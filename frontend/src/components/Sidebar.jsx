@@ -7,11 +7,14 @@ export const Sidebar = ({ currentTab, setTab }) => {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'applications', label: 'Application Keys', icon: '🔑' },
+    { id: 'chat_tracking', label: 'Chat Tracking', icon: '💬' },
+    { id: 'app_downloads', label: 'App Downloads', icon: '📥' },
     { id: 'users', label: 'User Directory', icon: '👥' },
     { id: 'revenue', label: 'Revenue & Plans', icon: '💳' },
     { id: 'logs', label: 'Central Logs', icon: '📜' },
     { id: 'sandbox', label: 'API Sandbox', icon: '⚡' },
   ];
+
 
   return (
     <aside className="sidebar">

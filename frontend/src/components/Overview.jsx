@@ -27,18 +27,27 @@ ChartJS.register(
 export const Overview = () => {
   const { authFetch } = useAuth();
   const [stats, setStats] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await authFetch('/api/admin/stats');
-      if (res.ok) {
-        const data = await res.json();
+      const [statsRes, telemetryRes] = await Promise.all([
+        authFetch('/api/admin/stats'),
+        authFetch('/api/telemetry/overview')
+      ]);
+
+      if (statsRes.ok) {
+        const data = await statsRes.json();
         setStats(data);
       }
+      if (telemetryRes.ok) {
+        const tData = await telemetryRes.json();
+        setTelemetry(tData);
+      }
     } catch (err) {
-      console.error('Failed to fetch stats:', err);
+      console.error('Failed to fetch overview data:', err);
     } finally {
       setLoading(false);
     }
@@ -79,8 +88,48 @@ export const Overview = () => {
     return <div style={{ color: 'var(--text-muted)' }}>Loading platform analytics...</div>;
   }
 
+  const appTenants = [
+    { code: 'ailegal', name: 'AI Legal', icon: '⚖️' },
+    { code: 'aisa', name: 'AISA Assistant', icon: '🤖' },
+    { code: 'aiads', name: 'AI Ads Generator', icon: '📢' },
+    { code: 'uwoconnect', name: 'UWO Connect', icon: '🔗' },
+    { code: 'efvframework', name: 'EFV Framework', icon: '🚀' },
+  ];
+
   return (
     <div>
+      {/* Connected Applications Tenant Bar */}
+      <div style={{ marginBottom: '20px' }}>
+        <h4 style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.1em', marginBottom: '10px' }}>
+          Connected Application Tenants
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          {appTenants.map((app) => (
+            <div
+              key={app.code}
+              style={{
+                padding: '12px 16px',
+                borderRadius: '16px',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '18px' }}>{app.icon}</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#f8fafc' }}>{app.name}</span>
+              </div>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.15)', padding: '2px 8px', borderRadius: '10px' }}>
+                ACTIVE
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Metrics Grid */}
       <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-header">
@@ -89,15 +138,6 @@ export const Overview = () => {
           </div>
           <div className="metric-value">{stats?.total_users || 0}</div>
           <div className="metric-sub">{stats?.verified_users || 0} verified users</div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-header">
-            <span>Connected Apps</span>
-            <div className="metric-icon">🔑</div>
-          </div>
-          <div className="metric-value">{stats?.total_applications || 0}</div>
-          <div className="metric-sub">{stats?.active_applications || 0} active keys</div>
         </div>
 
         <div className="metric-card">
@@ -113,11 +153,20 @@ export const Overview = () => {
 
         <div className="metric-card">
           <div className="metric-header">
-            <span>Central Logs</span>
-            <div className="metric-icon">📜</div>
+            <span>App Downloads</span>
+            <div className="metric-icon">📥</div>
           </div>
-          <div className="metric-value">{stats?.total_logs || 0}</div>
-          <div className="metric-sub">Across connected apps</div>
+          <div className="metric-value">{telemetry?.total_downloads || 0}</div>
+          <div className="metric-sub">Across all platforms</div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-header">
+            <span>AI Tokens Consumed</span>
+            <div className="metric-icon">🧠</div>
+          </div>
+          <div className="metric-value">{(telemetry?.total_tokens || 0).toLocaleString()}</div>
+          <div className="metric-sub">{telemetry?.total_chat_sessions || 0} prompt sessions</div>
         </div>
       </div>
 
@@ -125,10 +174,11 @@ export const Overview = () => {
         <div className="section-header">
           <div className="section-title">Revenue & Subscription Activity</div>
         </div>
-        <div style={{ height: '300px' }}>
+        <div style={{ height: '280px' }}>
           <Line data={chartData} options={chartOptions} />
         </div>
       </div>
     </div>
   );
 };
+
