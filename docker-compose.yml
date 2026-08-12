@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: unified_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: unified_service_db
+    volumes:
+      - mongo_data:/data/db
+
+  unified_dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: unified_dashboard_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=unified_service_db
+      - JWT_SECRET_KEY=production_secure_jwt_secret_key_2026
+      - ENVIRONMENT=production
+    depends_on:
+      - mongodb
+
+volumes:
+  mongo_data:
