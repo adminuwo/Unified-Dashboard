@@ -93,12 +93,16 @@ class User(MongoModel):
         return self._data.get("subscriptions", [])
 
 
+VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "general"}
+
+
 class ApplicationKey(MongoModel):
     @classmethod
     def create_dict(
         cls,
         application_name: str,
         api_key_hash: str,
+        app_code: str = "general",
         status: str = "active",
         key_id: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -106,6 +110,7 @@ class ApplicationKey(MongoModel):
         return {
             "_id": key_id or generate_uuid(),
             "application_name": application_name,
+            "app_code": app_code.lower(),
             "api_key_hash": api_key_hash,
             "status": status,
             "created_at": now,
@@ -115,6 +120,14 @@ class ApplicationKey(MongoModel):
     @property
     def application_name(self) -> str:
         return self._data.get("application_name", "")
+
+    @property
+    def app_code(self) -> str:
+        return self._data.get("app_code", "general")
+
+    @app_code.setter
+    def app_code(self, val: str):
+        self._data["app_code"] = val.lower()
 
     @property
     def api_key_hash(self) -> str:
@@ -385,3 +398,131 @@ class LogEntry(MongoModel):
     @property
     def created_at(self) -> datetime:
         return self._data.get("created_at") or utc_now()
+
+
+class ChatTrackingEntry(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        application_id: str,
+        app_code: str,
+        session_id: str,
+        model_name: str,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        total_tokens: int = 0,
+        latency_ms: float = 0.0,
+        user_id: Optional[str] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
+        entry_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        calc_total = total_tokens if total_tokens > 0 else (prompt_tokens + completion_tokens)
+        return {
+            "_id": entry_id or generate_uuid(),
+            "application_id": application_id,
+            "app_code": app_code.lower(),
+            "session_id": session_id,
+            "user_id": user_id,
+            "model_name": model_name,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": calc_total,
+            "latency_ms": latency_ms,
+            "metadata": extra_metadata or {},
+            "created_at": now,
+        }
+
+    @property
+    def application_id(self) -> str:
+        return self._data.get("application_id", "")
+
+    @property
+    def app_code(self) -> str:
+        return self._data.get("app_code", "")
+
+    @property
+    def session_id(self) -> str:
+        return self._data.get("session_id", "")
+
+    @property
+    def user_id(self) -> Optional[str]:
+        return self._data.get("user_id")
+
+    @property
+    def model_name(self) -> str:
+        return self._data.get("model_name", "unknown")
+
+    @property
+    def prompt_tokens(self) -> int:
+        return int(self._data.get("prompt_tokens", 0))
+
+    @property
+    def completion_tokens(self) -> int:
+        return int(self._data.get("completion_tokens", 0))
+
+    @property
+    def total_tokens(self) -> int:
+        return int(self._data.get("total_tokens", 0))
+
+    @property
+    def latency_ms(self) -> float:
+        return float(self._data.get("latency_ms", 0.0))
+
+    @property
+    def created_at(self) -> datetime:
+        return self._data.get("created_at") or utc_now()
+
+
+class AppDownloadEntry(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        application_id: str,
+        app_code: str,
+        platform: str,
+        version: str = "1.0.0",
+        ip_country: str = "IN",
+        user_id: Optional[str] = None,
+        entry_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": entry_id or generate_uuid(),
+            "application_id": application_id,
+            "app_code": app_code.lower(),
+            "platform": platform.lower(),
+            "version": version,
+            "ip_country": ip_country,
+            "user_id": user_id,
+            "created_at": now,
+        }
+
+    @property
+    def application_id(self) -> str:
+        return self._data.get("application_id", "")
+
+    @property
+    def app_code(self) -> str:
+        return self._data.get("app_code", "")
+
+    @property
+    def platform(self) -> str:
+        return self._data.get("platform", "web")
+
+    @property
+    def version(self) -> str:
+        return self._data.get("version", "1.0.0")
+
+    @property
+    def ip_country(self) -> str:
+        return self._data.get("ip_country", "IN")
+
+    @property
+    def user_id(self) -> Optional[str]:
+        return self._data.get("user_id")
+
+    @property
+    def created_at(self) -> datetime:
+        return self._data.get("created_at") or utc_now()
+

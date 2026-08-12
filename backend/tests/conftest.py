@@ -1,9 +1,15 @@
+import os
 import pytest  # type: ignore
 from fastapi.testclient import TestClient  # type: ignore
 import mongomock  # type: ignore
 
+os.environ["ENVIRONMENT"] = "testing"
+from src.config.settings import settings
+settings.ENVIRONMENT = "testing"
+
 from src.database.connection import get_db, init_db
 from src.main import app
+
 
 
 @pytest.fixture(scope="function")

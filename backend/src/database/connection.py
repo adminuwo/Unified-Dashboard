@@ -11,19 +11,27 @@ def get_client() -> pymongo.MongoClient:
     global _client
     if _client is None:
         try:
-            client = pymongo.MongoClient(
-                settings.MONGODB_URL,
-                serverSelectionTimeoutMS=2500,
-                tlsAllowInvalidCertificates=True
-            )
+            mongo_kwargs = {
+                "serverSelectionTimeoutMS": 2500,
+                "tlsAllowInvalidCertificates": True,
+            }
+            try:
+                import certifi
+                mongo_kwargs["tlsCAFile"] = certifi.where()
+            except ImportError:
+                pass
+
+            client = pymongo.MongoClient(settings.MONGODB_URL, **mongo_kwargs)
             # Test ping to verify cluster reachability
             client.admin.command('ping')
             _client = client
+            print("[Database Connection] Connected successfully to MongoDB Atlas cluster.")
         except Exception as e:
             print(f"[Database Connection] MongoDB Atlas cluster unreachable ({e}). Falling back to in-memory database.")
             import mongomock
             _client = mongomock.MongoClient()
     return _client
+
 
 
 def get_db() -> Generator[Database, None, None]:
@@ -62,8 +70,19 @@ def init_db(db: Database | None = None):
         db["logs"].create_index("application_id")
         db["logs"].create_index("user_id")
         db["logs"].create_index("level")
+        db["logs"].create_index("app_code")
+
+        db["chat_tracking"].create_index([("created_at", pymongo.DESCENDING)])
+        db["chat_tracking"].create_index("app_code")
+        db["chat_tracking"].create_index("session_id")
+        db["chat_tracking"].create_index("model_name")
+
+        db["app_downloads"].create_index([("created_at", pymongo.DESCENDING)])
+        db["app_downloads"].create_index("app_code")
+        db["app_downloads"].create_index("platform")
     except Exception as e:
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
+
 
     # Seed 4 official master admin users
     try:
@@ -100,6 +119,41 @@ def init_db(db: Database | None = None):
         print("[init_db] 4 official admin accounts seeded successfully.")
     except Exception as e:
         print(f"[init_db] Admin seeding note: {e}")
+
+    # Seed 5 master application API keys
+    try:
+        from src.middleware.authentication import hash_api_key
+        apps_to_seed = [
+            ("app_key_ailegal_1001", "AI Legal", "ailegal", "key_ailegal_live_master_2026"),
+            ("app_key_aisa_2001", "AISA Assistant", "aisa", "key_aisa_live_master_2026"),
+            ("app_key_aiads_3001", "AI Ads Generator", "aiads", "key_aiads_live_master_2026"),
+            ("app_key_uwoconnect_4001", "UWO Connect", "uwoconnect", "key_uwoconnect_live_master_2026"),
+            ("app_key_efvframework_5001", "EFV Framework", "efvframework", "key_efvframework_live_master_2026"),
+        ]
+        for key_id, app_name, app_code, plain_key in apps_to_seed:
+            key_hash = hash_api_key(plain_key)
+            existing = db["application_keys"].find_one({"app_code": app_code})
+            if not existing:
+                db["application_keys"].insert_one({
+                    "_id": key_id,
+                    "application_name": app_name,
+                    "app_code": app_code,
+                    "api_key_hash": key_hash,
+                    "status": "active"
+                })
+            else:
+                db["application_keys"].update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {
+                        "application_name": app_name,
+                        "app_code": app_code,
+                        "api_key_hash": key_hash,
+                        "status": "active"
+                    }}
+                )
+    except Exception as e:
+        print(f"[init_db] App keys seeding note: {e}")
+
 
     # Seed initial sample data if empty (only when not running unit tests)
     import os

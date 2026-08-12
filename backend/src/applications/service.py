@@ -19,11 +19,14 @@ def create_application_key(db: Database, data: AppKeyCreate) -> Tuple[Applicatio
     plaintext_key = generate_plaintext_api_key()
     key_hash = hash_api_key(plaintext_key)
 
+    app_code = data.app_code or "general"
     app_key_dict = ApplicationKey.create_dict(
         application_name=data.application_name,
+        app_code=app_code,
         api_key_hash=key_hash,
         status="active"
     )
+
 
     db["application_keys"].insert_one(app_key_dict)
     app_key = ApplicationKey(app_key_dict)

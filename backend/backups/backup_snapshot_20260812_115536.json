@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-08-12T11:55:36.335125+00:00",
+  "database_name": "unified_service_db",
+  "collections": {
+    "users": [],
+    "admin_users": [],
+    "application_keys": [],
+    "chat_tracking": [],
+    "app_downloads": [],
+    "logs": [],
+    "payments": [],
+    "subscriptions": []
+  }
+}

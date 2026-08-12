@@ -6,19 +6,24 @@ import pytest  # type: ignore
 from src.config.settings import settings
 
 
+import uuid
+
 @pytest.fixture
 def payment_setup(client):
-    app_res = client.post("/api/applications/keys", json={"application_name": "Payment App"})
+    app_res = client.post("/api/applications/keys", json={"application_name": f"Payment App {uuid.uuid4().hex[:6]}"})
     api_key = app_res.json()["api_key"]
 
+
+    email = f"payer_{uuid.uuid4().hex[:6]}@example.com"
     reg_res = client.post(
         "/api/auth/register",
-        json={"email": "payer@example.com", "password": "Password123!", "name": "Payer User"},
+        json={"email": email, "password": "Password123!", "name": "Payer User"},
         headers={"X-Application-Key": api_key}
     )
     user_id = reg_res.json()["id"]
 
     return api_key, user_id
+
 
 
 def test_create_and_get_payment_status(client, payment_setup):

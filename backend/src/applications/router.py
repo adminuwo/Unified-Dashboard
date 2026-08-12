@@ -16,11 +16,13 @@ def create_key(data: AppKeyCreate, db: Database = Depends(get_db)):
     return AppKeyCreatedResponse(
         id=app_key.id,
         application_name=app_key.application_name,
+        app_code=app_key.app_code,
         status=app_key.status,
         created_at=app_key.created_at,
         updated_at=app_key.updated_at,
         api_key=plaintext_key
     )
+
 
 
 @router.get("/keys", response_model=List[AppKeyResponse])

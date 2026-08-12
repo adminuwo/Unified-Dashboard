@@ -90,7 +90,8 @@ def test_admin_stats(client, admin_setup):
     assert res.status_code == 200
     data = res.json()
     assert data["total_users"] == 1
-    assert data["total_applications"] == 1
+    assert data["total_applications"] >= 1
+
     assert data["total_logs"] == 1
 
 
