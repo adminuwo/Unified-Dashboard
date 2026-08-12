@@ -28,6 +28,7 @@ class SlidingWindowRateLimiter:
         return True, 0
 
 
+import os
 from src.config.settings import settings
 
 # Global singleton instance
@@ -37,8 +38,9 @@ rate_limiter = SlidingWindowRateLimiter()
 def rate_limit(max_requests: int = 30, window_seconds: int = 60):
     """FastAPI dependency factory enforcing rate limits per client IP."""
     async def _rate_limit_dependency(request: Request):
-        if settings.ENVIRONMENT == "testing":
+        if os.getenv("ENVIRONMENT") == "testing" or settings.ENVIRONMENT == "testing":
             return
+
 
         client_ip = request.client.host if request.client else "127.0.0.1"
         # Combine IP and endpoint path for granular per-route rate limiting
