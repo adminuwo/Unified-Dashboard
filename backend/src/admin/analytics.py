@@ -1,12 +1,13 @@
 from typing import Dict, Any
 from pymongo.database import Database  # type: ignore
 
+import re
 
 def get_app_overlap_stats(db: Database) -> Dict[str, Any]:
     """Calculate registration and login crossover metrics between AISA, AI Legal, and other connected apps."""
     # Find AISA and AI Legal applications by name (case-insensitive)
-    aisa_app = db["application_keys"].find_one({"application_name": {"$regex": "^aisa$", "$options": "i"}})
-    legal_app = db["application_keys"].find_one({"application_name": {"$regex": "^ai\\s*legal(s)?$", "$options": "i"}})
+    aisa_app = db["application_keys"].find_one({"application_name": re.compile(r"^aisa$", re.IGNORECASE)})
+    legal_app = db["application_keys"].find_one({"application_name": re.compile(r"^ai\s*legal(s)?$", re.IGNORECASE)})
 
     aisa_id = str(aisa_app["_id"]) if aisa_app else None
     legal_id = str(legal_app["_id"]) if legal_app else None

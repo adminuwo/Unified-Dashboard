@@ -4,6 +4,8 @@ from src.auth.service import hash_password
 
 @pytest.fixture
 def analytics_setup(client, db_session):
+    # Clear any seeded application keys to avoid name conflicts with our test keys
+    db_session["application_keys"].delete_many({})
     # 1. Create AISA App Key
     aisa_res = client.post("/api/applications/keys", json={"application_name": "AISA"})
     aisa_key = aisa_res.json()["api_key"]
