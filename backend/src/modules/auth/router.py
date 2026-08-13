@@ -50,11 +50,13 @@ def login_user(
     device_info = request.headers.get("User-Agent", "Unknown Device")
     client_ip = request.client.host if request.client else "127.0.0.1"
 
+    app_id = getattr(_app, "id", None) if _app else None
     return service.login(
         email=payload.email,
         password=payload.password,
         device=device_info,
-        ip_address=client_ip
+        ip_address=client_ip,
+        application_id=app_id
     )
 
 

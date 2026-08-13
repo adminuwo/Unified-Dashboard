@@ -53,7 +53,8 @@ class AuthService:
         email: str,
         password: str,
         device: str = "Unknown Device",
-        ip_address: str = "127.0.0.1"
+        ip_address: str = "127.0.0.1",
+        application_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Authenticate user, create session, and issue access & refresh tokens."""
         user = self.repo.get_user_by_email(email)
@@ -69,8 +70,8 @@ class AuthService:
                 detail="Account is inactive or disabled"
             )
 
-        # Update last login timestamp
-        self.repo.update_last_login(user["_id"])
+        # Update last login timestamp and connected_apps
+        self.repo.update_last_login(user["_id"], application_id=application_id)
 
         # Generate tokens
         access_token = create_access_token(user_id=user["_id"], email=user["email"])

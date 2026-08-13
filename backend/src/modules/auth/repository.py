@@ -46,11 +46,15 @@ class AuthRepository:
         self.users_col.insert_one(user_doc)
         return user_doc
 
-    def update_last_login(self, user_id: str) -> None:
+    def update_last_login(self, user_id: str, application_id: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc)
+        update_doc: Dict[str, Any] = {"$set": {"last_login": now, "updated_at": now}}
+        if application_id:
+            update_doc["$addToSet"] = {"connected_apps": application_id}
+            
         self.users_col.update_one(
             {"_id": user_id},
-            {"$set": {"last_login": now, "updated_at": now}}
+            update_doc
         )
 
     # ------------------ SESSIONS COLLECTION ------------------
