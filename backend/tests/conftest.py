@@ -1,9 +1,15 @@
+import os
 import pytest  # type: ignore
 from fastapi.testclient import TestClient  # type: ignore
 import mongomock  # type: ignore
 
+os.environ["ENVIRONMENT"] = "testing"
+from src.config.settings import settings
+settings.ENVIRONMENT = "testing"
+
 from src.database.connection import get_db, init_db
 from src.main import app
+
 
 
 @pytest.fixture(scope="function")
@@ -25,3 +31,14 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="function")
+def admin_headers(client, db_session):
+    """Fixture providing valid admin JWT authorization header."""
+    res = client.post("/api/admin/login", json={
+        "username": "super.admin@unified.com",
+        "password": "@xQn!W&Wg-ufSWn)93Qg_0S2"
+    })
+    token = res.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

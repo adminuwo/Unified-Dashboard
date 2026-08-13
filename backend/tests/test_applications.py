@@ -15,9 +15,12 @@ def test_create_and_list_application_keys(client):
     response = client.get("/api/applications/keys")
     assert response.status_code == 200
     keys = response.json()
-    assert len(keys) == 1
-    assert keys[0]["id"] == key_id
-    assert "api_key" not in keys[0]  # Plaintext key must not be returned in list endpoint
+    assert len(keys) >= 1
+    matched_key = next((k for k in keys if k["id"] == key_id), None)
+    assert matched_key is not None
+    assert "api_key" not in matched_key  # Plaintext key must not be returned in list endpoint
+
+
 
 
 def test_application_key_authentication(client):

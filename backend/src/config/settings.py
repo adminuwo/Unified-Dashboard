@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     EMAIL_API_KEY: str = "mock_email_api_key_abc123"
     EXTERNAL_API_KEY: str = "mock_external_service_key_xyz789"
 
+    # Google Play Store Reporting & Analytics Configuration
+    GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: str | None = None
+    GOOGLE_PLAY_PROJECT_ID: str | None = None
+    GOOGLE_PLAY_GCS_BUCKET_ID: str | None = None
+    PLAY_STORE_SYNC_INTERVAL_HOURS: int = 24
+
     @property
     def cors_origins(self) -> List[str]:
         if not self.ALLOWED_ORIGINS or self.ALLOWED_ORIGINS == "*":

@@ -4,19 +4,24 @@ from datetime import datetime, timedelta, timezone
 from src.database.models import VerificationToken, User
 
 
+import uuid
+
 @pytest.fixture
 def setup_user_and_app(client):
-    app_res = client.post("/api/applications/keys", json={"application_name": "Verification App"})
+    app_res = client.post("/api/applications/keys", json={"application_name": f"Verification App {uuid.uuid4().hex[:6]}"})
     api_key = app_res.json()["api_key"]
 
+
+    email = f"verifyuser_{uuid.uuid4().hex[:6]}@example.com"
     reg_res = client.post(
         "/api/auth/register",
-        json={"email": "verifyuser@example.com", "password": "Password123!", "name": "Verify User"},
+        json={"email": email, "password": "Password123!", "name": "Verify User"},
         headers={"X-Application-Key": api_key}
     )
     user_id = reg_res.json()["id"]
 
     return api_key, user_id
+
 
 
 def test_send_and_verify_token(client, setup_user_and_app):

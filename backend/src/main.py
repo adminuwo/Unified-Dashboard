@@ -9,18 +9,32 @@ from src.config.settings import settings
 from src.database.connection import init_db, get_db, check_db_connection
 
 from src.applications.router import router as applications_router
-from src.auth.router import router as auth_router
+from src.modules.auth.router import router as auth_router
 from src.verification.router import router as verification_router
 from src.payment.router import router as payment_router
 from src.logs.router import router as logs_router
 from src.admin.router import router as admin_router
+from src.telemetry.router import router as telemetry_router
+from src.store_analytics.router import router as store_analytics_router
+from src.store_analytics.scheduler import (
+    start_store_analytics_scheduler,
+    shutdown_store_analytics_scheduler
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle handler."""
     init_db()
+    try:
+        start_store_analytics_scheduler()
+    except Exception as e:
+        print(f"[lifespan] Note: Store analytics scheduler initialization: {e}")
     yield
+    try:
+        shutdown_store_analytics_scheduler()
+    except Exception:
+        pass
 
 
 # Disable Swagger UI & OpenAPI schema in production environment for security hardening
@@ -74,21 +88,47 @@ app.include_router(verification_router, prefix="/api")
 app.include_router(payment_router, prefix="/api")
 app.include_router(logs_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(telemetry_router, prefix="/api")
+app.include_router(store_analytics_router, prefix="/api")
 
-# Mount frontend directory for Web Dashboard UI
+
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse  # type: ignore
+
+# Mount frontend static assets and SPA fallback
 frontend_dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
 frontend_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend"))
 
 if os.path.exists(frontend_dist_dir):
-    app.mount("/app", StaticFiles(directory=frontend_dist_dir, html=True), name="frontend")
-elif os.path.exists(frontend_src_dir):
-    app.mount("/app", StaticFiles(directory=frontend_src_dir, html=True), name="frontend")
+    assets_dir = os.path.join(frontend_dist_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/app/assets", StaticFiles(directory=assets_dir), name="app_assets")
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="dist_assets")
+    app.mount("/app", StaticFiles(directory=frontend_dist_dir, html=True), name="frontend_dist")
+else:
+    app.mount("/app", StaticFiles(directory=frontend_src_dir, html=True), name="frontend_src")
 
 
 @app.get("/", include_in_schema=False)
 def root_redirect():
     """Redirect root path to the Web Dashboard."""
     return RedirectResponse(url="/app/")
+
+
+@app.get("/app/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str = ""):
+    """Serve Single Page Application (SPA) index.html for dashboard routes."""
+    if os.path.exists(frontend_dist_dir):
+        if full_path:
+            clean_path = os.path.normpath(os.path.join(frontend_dist_dir, full_path.lstrip("/")))
+            if os.path.exists(clean_path) and os.path.isfile(clean_path):
+                return FileResponse(clean_path)
+        index_path = os.path.join(frontend_dist_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+    return RedirectResponse(url="/app/")
+
+
+
 
 
 @app.get("/api/health", tags=["Health Check"])

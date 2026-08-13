@@ -10,6 +10,11 @@ import { UserDirectory } from './components/UserDirectory';
 import { RevenuePlans } from './components/RevenuePlans';
 import { CentralLogs } from './components/CentralLogs';
 import { ApiSandbox } from './components/ApiSandbox';
+import { ChatTrackingTab } from './components/ChatTrackingTab';
+import { AppDownloadsTab } from './components/AppDownloadsTab';
+import { StoreAnalytics } from './components/StoreAnalytics';
+
+import { AuthTokenTester } from './components/AuthTokenTester';
 
 export function App() {
   const { token } = useAuth();
@@ -22,7 +27,11 @@ export function App() {
   const tabTitles = {
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
+    auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
+    store_analytics: { title: 'App Store Analytics', subtitle: 'Google Play reporting & install metrics for AISA and AI Legal' },
     applications: { title: 'Application API Keys', subtitle: 'Manage API credentials for connected standalone applications' },
+    chat_tracking: { title: 'AI Chat Prompt Tracking', subtitle: 'Real-time AI model token consumption and session metrics' },
+    app_downloads: { title: 'App Downloads & Installs', subtitle: 'Platform distribution across Android, iOS, Windows and Web PWA' },
     users: { title: 'Central User Directory', subtitle: 'View registered user identities across applications' },
     revenue: { title: 'Revenue & Subscriptions', subtitle: 'Payment transactions (₹ INR) and application subscriptions' },
     logs: { title: 'Central Application Logs', subtitle: 'Real-time security and audit logs from connected apps' },
@@ -44,7 +53,11 @@ export function App() {
         <main className="main-content">
           {currentTab === 'overview' && <Overview />}
           {currentTab === 'overlap' && <OverlapAnalytics />}
+          {currentTab === 'auth_tester' && <AuthTokenTester />}
+          {currentTab === 'store_analytics' && <StoreAnalytics />}
           {currentTab === 'applications' && <ApplicationKeys />}
+          {currentTab === 'chat_tracking' && <ChatTrackingTab />}
+          {currentTab === 'app_downloads' && <AppDownloadsTab />}
           {currentTab === 'users' && <UserDirectory />}
           {currentTab === 'revenue' && <RevenuePlans />}
           {currentTab === 'logs' && <CentralLogs />}
@@ -56,3 +69,4 @@ export function App() {
 }
 
 export default App;
+
