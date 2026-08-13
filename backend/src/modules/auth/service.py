@@ -21,7 +21,7 @@ class AuthService:
     def __init__(self, db: Database):
         self.repo = AuthRepository(db)
 
-    def register(self, email: str, password: str, name: str = "User") -> Dict[str, Any]:
+    def register(self, email: str, password: str, name: str = "User", application_id: Optional[str] = None) -> Dict[str, Any]:
         """Register a new user in the central users collection."""
         existing_user = self.repo.get_user_by_email(email)
         if existing_user:
@@ -36,7 +36,8 @@ class AuthService:
             password_hash=hashed,
             name=name,
             is_verified=False,
-            is_active=True
+            is_active=True,
+            connected_apps=[application_id] if application_id else None
         )
         return {
             "id": user["_id"],

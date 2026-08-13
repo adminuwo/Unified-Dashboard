@@ -27,7 +27,8 @@ class AuthRepository:
         password_hash: str,
         name: str = "User",
         is_verified: bool = True,
-        is_active: bool = True
+        is_active: bool = True,
+        connected_apps: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
         user_doc = {
@@ -37,6 +38,7 @@ class AuthRepository:
             "name": name,
             "is_active": is_active,
             "is_verified": is_verified,
+            "connected_apps": connected_apps or [],
             "created_at": now,
             "updated_at": now,
             "last_login": None,

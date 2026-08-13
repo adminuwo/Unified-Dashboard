@@ -30,10 +30,12 @@ def register_user(
     service: AuthService = Depends(get_auth_service)
 ):
     """Register a new central user identity."""
+    app_id = getattr(_app, "id", None) if _app else None
     return service.register(
         email=payload.email,
         password=payload.password,
-        name=payload.name or "User"
+        name=payload.name or "User",
+        application_id=app_id
     )
 
 
