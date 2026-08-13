@@ -1,7 +1,7 @@
 import secrets
 import bcrypt  # type: ignore
 from datetime import datetime, timedelta, timezone
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from pymongo.database import Database  # type: ignore
 from fastapi import HTTPException, status  # type: ignore
 from jose import jwt, JWTError  # type: ignore
@@ -38,7 +38,7 @@ def create_jwt_token(data: dict, expires_delta: timedelta, token_type: str = "ac
     return encoded_jwt
 
 
-def register_user(db: Database, user_in: UserRegister) -> Tuple[User, str]:
+def register_user(db: Database, user_in: UserRegister, application_id: Optional[str] = None) -> Tuple[User, str]:
     """Register a new user, returning the User object and a new verification token."""
     existing = db["users"].find_one({"email": user_in.email.lower()})
     if existing:
@@ -52,7 +52,8 @@ def register_user(db: Database, user_in: UserRegister) -> Tuple[User, str]:
         password_hash=hash_password(user_in.password),
         name=user_in.name,
         is_verified=False,
-        is_active=True
+        is_active=True,
+        connected_apps=[application_id] if application_id else None
     )
     db["users"].insert_one(user_dict)
     db_user = User(user_dict)
@@ -70,8 +71,8 @@ def register_user(db: Database, user_in: UserRegister) -> Tuple[User, str]:
     return db_user, verification_token_str
 
 
-def authenticate_user(db: Database, login_in: UserLogin) -> User:
-    """Authenticate user credentials."""
+def authenticate_user(db: Database, login_in: UserLogin, application_id: Optional[str] = None) -> User:
+    """Authenticate user credentials and link the application ID if specified."""
     user_doc = db["users"].find_one({"email": login_in.email.lower()})
     if not user_doc or not verify_password(login_in.password, user_doc.get("password_hash", "")):
         raise HTTPException(
@@ -85,6 +86,17 @@ def authenticate_user(db: Database, login_in: UserLogin) -> User:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated."
         )
+
+    if application_id:
+        db["users"].update_one(
+            {"_id": user.id},
+            {"$addToSet": {"connected_apps": application_id}}
+        )
+        # Update user object representation
+        if "connected_apps" not in user._data:
+            user._data["connected_apps"] = []
+        if application_id not in user._data["connected_apps"]:
+            user._data["connected_apps"].append(application_id)
 
     return user
 

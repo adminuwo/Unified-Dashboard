@@ -111,27 +111,100 @@ def init_db(db: Database | None = None):
                 from datetime import datetime, timezone
                 now = datetime.now(timezone.utc).isoformat()
 
-                demo_user_id = "user_demo_uuid_1001"
-                db["users"].insert_one({
-                    "_id": demo_user_id,
-                    "email": "user@domain.com",
-                    "password_hash": hash_password("user123"),
-                    "name": "Demo User",
-                    "is_verified": True,
-                    "is_active": True,
-                    "created_at": now,
-                    "updated_at": now
-                })
-
                 demo_app_id = "app_demo_uuid_2001"
-                db["application_keys"].insert_one({
-                    "_id": demo_app_id,
-                    "application_name": "Standalone Application",
-                    "api_key": "key_demo_app_key_123",
-                    "api_key_hash": hash_password("key_demo_app_key_123"),
-                    "status": "active",
-                    "created_at": now
-                })
+                aisa_app_id = "app_aisa_uuid_2002"
+                ailegal_app_id = "app_ailegal_uuid_2003"
+
+                # Seed application keys first
+                db["application_keys"].insert_many([
+                    {
+                        "_id": demo_app_id,
+                        "application_name": "Standalone Application",
+                        "api_key": "key_demo_app_key_123",
+                        "api_key_hash": hash_password("key_demo_app_key_123"),
+                        "status": "active",
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": aisa_app_id,
+                        "application_name": "AISA",
+                        "api_key": "key_aisa_app_key_456",
+                        "api_key_hash": hash_password("key_aisa_app_key_456"),
+                        "status": "active",
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": ailegal_app_id,
+                        "application_name": "AI Legal",
+                        "api_key": "key_ailegal_app_key_789",
+                        "api_key_hash": hash_password("key_ailegal_app_key_789"),
+                        "status": "active",
+                        "created_at": now,
+                        "updated_at": now
+                    }
+                ])
+
+                # Seed users
+                demo_user_id = "user_demo_uuid_1001"
+                db["users"].insert_many([
+                    {
+                        "_id": demo_user_id,
+                        "email": "user@domain.com",
+                        "password_hash": hash_password("user123"),
+                        "name": "Demo User",
+                        "is_verified": True,
+                        "is_active": True,
+                        "connected_apps": [demo_app_id],
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": "user_aisa_only",
+                        "email": "aisa.user@domain.com",
+                        "password_hash": hash_password("aisa123"),
+                        "name": "AISA User",
+                        "is_verified": True,
+                        "is_active": True,
+                        "connected_apps": [aisa_app_id],
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": "user_legal_only",
+                        "email": "legal.user@domain.com",
+                        "password_hash": hash_password("legal123"),
+                        "name": "AI Legal User",
+                        "is_verified": True,
+                        "is_active": True,
+                        "connected_apps": [ailegal_app_id],
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": "user_both_1",
+                        "email": "both1@domain.com",
+                        "password_hash": hash_password("both123"),
+                        "name": "Dual User Alpha",
+                        "is_verified": True,
+                        "is_active": True,
+                        "connected_apps": [aisa_app_id, ailegal_app_id],
+                        "created_at": now,
+                        "updated_at": now
+                    },
+                    {
+                        "_id": "user_both_2",
+                        "email": "both2@domain.com",
+                        "password_hash": hash_password("both123"),
+                        "name": "Dual User Beta",
+                        "is_verified": True,
+                        "is_active": True,
+                        "connected_apps": [aisa_app_id, ailegal_app_id],
+                        "created_at": now,
+                        "updated_at": now
+                    }
+                ])
 
                 db["subscriptions"].insert_one({
                     "_id": "sub_demo_3001",

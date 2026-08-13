@@ -17,7 +17,7 @@ from src.admin.schemas import (
     AdminSubscriptionListItem,
     AdminLogListItem
 )
-from src.admin import service
+from src.admin import service, analytics
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
 security = HTTPBearer(auto_error=False)
@@ -121,3 +121,12 @@ def get_logs(
 ):
     """List centralized logs."""
     return service.list_logs(db, level=level, app_id=application_id, limit=limit)
+
+
+@router.get("/analytics/overlap")
+def get_analytics_overlap(
+    admin: str = Depends(get_current_admin),
+    db: Database = Depends(get_db)
+):
+    """Retrieve crossover engagement and overlap stats for connected standalone apps."""
+    return analytics.get_app_overlap_stats(db)

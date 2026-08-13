@@ -17,7 +17,7 @@ def register(
     app: ApplicationKey = Depends(get_current_application)
 ):
     """Register a new user under central identity via standalone application."""
-    user, _ = service.register_user(db, user_in)
+    user, _ = service.register_user(db, user_in, application_id=app.id)
     return user
 
 
@@ -28,7 +28,7 @@ def login(
     app: ApplicationKey = Depends(get_current_application)
 ):
     """Authenticate user credentials and issue JWT tokens for standalone application."""
-    user = service.authenticate_user(db, login_in)
+    user = service.authenticate_user(db, login_in, application_id=app.id)
     tokens = service.generate_auth_tokens(user)
     return TokenResponse(
         access_token=tokens["access_token"],

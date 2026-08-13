@@ -34,7 +34,8 @@ class User(MongoModel):
         name: str,
         is_verified: bool = False,
         is_active: bool = True,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        connected_apps: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         now = utc_now()
         return {
@@ -44,6 +45,7 @@ class User(MongoModel):
             "name": name,
             "is_verified": is_verified,
             "is_active": is_active,
+            "connected_apps": connected_apps or [],
             "created_at": now,
             "updated_at": now,
         }
@@ -51,6 +53,10 @@ class User(MongoModel):
     @property
     def email(self) -> str:
         return self._data.get("email", "")
+
+    @property
+    def connected_apps(self) -> List[str]:
+        return self._data.get("connected_apps", [])
 
     @property
     def password_hash(self) -> str:
@@ -380,6 +386,10 @@ class LogEntry(MongoModel):
 
     @property
     def extra_metadata(self) -> Optional[Dict[str, Any]]:
+        return self._data.get("metadata")
+
+    @property
+    def metadata(self) -> Optional[Dict[str, Any]]:
         return self._data.get("metadata")
 
     @property

@@ -4,6 +4,7 @@ import { Login } from './components/Login';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Overview } from './components/Overview';
+import { OverlapAnalytics } from './components/OverlapAnalytics';
 import { ApplicationKeys } from './components/ApplicationKeys';
 import { UserDirectory } from './components/UserDirectory';
 import { RevenuePlans } from './components/RevenuePlans';
@@ -20,6 +21,7 @@ export function App() {
 
   const tabTitles = {
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
+    overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     applications: { title: 'Application API Keys', subtitle: 'Manage API credentials for connected standalone applications' },
     users: { title: 'Central User Directory', subtitle: 'View registered user identities across applications' },
     revenue: { title: 'Revenue & Subscriptions', subtitle: 'Payment transactions (₹ INR) and application subscriptions' },
@@ -41,6 +43,7 @@ export function App() {
 
         <main className="main-content">
           {currentTab === 'overview' && <Overview />}
+          {currentTab === 'overlap' && <OverlapAnalytics />}
           {currentTab === 'applications' && <ApplicationKeys />}
           {currentTab === 'users' && <UserDirectory />}
           {currentTab === 'revenue' && <RevenuePlans />}
