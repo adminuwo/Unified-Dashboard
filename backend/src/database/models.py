@@ -526,3 +526,82 @@ class AppDownloadEntry(MongoModel):
     def created_at(self) -> datetime:
         return self._data.get("created_at") or utc_now()
 
+
+PROJECT_MAPPINGS: Dict[str, Dict[str, str]] = {
+    "AISA": {
+        "project": "AISA",
+        "platform": "android",
+        "package_name": "com.uwo.aisa",
+        "label": "AISA Android App"
+    },
+    "AI_LEGAL": {
+        "project": "AI_LEGAL",
+        "platform": "android",
+        "package_name": "com.uwo.ailegal",
+        "label": "AI Legal Android App"
+    }
+}
+
+
+class StoreAnalytics(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        project: str,
+        platform: str,
+        package_name: str,
+        date: str,
+        metric: str,
+        value: int,
+        source: str = "google_play_reporting_api",
+        record_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": record_id or generate_uuid(),
+            "project": project,
+            "platform": platform,
+            "package_name": package_name,
+            "date": date,
+            "metric": metric,
+            "value": value,
+            "source": source,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    @property
+    def project(self) -> str:
+        return self._data.get("project", "")
+
+    @property
+    def platform(self) -> str:
+        return self._data.get("platform", "android")
+
+    @property
+    def package_name(self) -> str:
+        return self._data.get("package_name", "")
+
+    @property
+    def date(self) -> str:
+        return self._data.get("date", "")
+
+    @property
+    def metric(self) -> str:
+        return self._data.get("metric", "installs")
+
+    @property
+    def value(self) -> int:
+        return int(self._data.get("value", 0))
+
+    @property
+    def source(self) -> str:
+        return self._data.get("source", "google_play_reporting_api")
+
+    @property
+    def created_at(self) -> datetime:
+        return self._data.get("created_at") or utc_now()
+
+    @property
+    def updated_at(self) -> datetime:
+        return self._data.get("updated_at") or utc_now()
