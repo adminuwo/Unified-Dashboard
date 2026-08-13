@@ -80,6 +80,16 @@ def init_db(db: Database | None = None):
         db["app_downloads"].create_index([("created_at", pymongo.DESCENDING)])
         db["app_downloads"].create_index("app_code")
         db["app_downloads"].create_index("platform")
+
+        db["store_analytics"].create_index([
+            ("project", 1),
+            ("platform", 1),
+            ("package_name", 1),
+            ("date", 1),
+            ("metric", 1)
+        ], unique=True)
+        db["store_analytics"].create_index("project")
+        db["store_analytics"].create_index("date")
     except Exception as e:
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
 
