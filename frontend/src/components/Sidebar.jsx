@@ -6,6 +6,7 @@ export const Sidebar = ({ currentTab, setTab }) => {
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: '📊' },
+    { id: 'auth_tester', label: 'Auth Service', icon: '🔒' },
     { id: 'applications', label: 'Application Keys', icon: '🔑' },
     { id: 'chat_tracking', label: 'Chat Tracking', icon: '💬' },
     { id: 'app_downloads', label: 'App Downloads', icon: '📥' },
