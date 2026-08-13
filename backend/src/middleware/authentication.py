@@ -40,6 +40,26 @@ def get_current_application(
     return ApplicationKey(app_doc)
 
 
+def validate_optional_app_key(
+    x_application_key: Optional[str] = Header(None, alias="X-Application-Key"),
+    db: Database = Depends(get_db)
+) -> Optional[ApplicationKey]:
+    """Validate X-Application-Key if header is present in request."""
+    if x_application_key:
+        key_hash = hash_api_key(x_application_key)
+        app_doc = db["application_keys"].find_one({
+            "api_key_hash": key_hash,
+            "status": "active"
+        })
+        if not app_doc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked application API key."
+            )
+        return ApplicationKey(app_doc)
+    return None
+
+
 def get_current_user(
     authorization: Optional[str] = Header(None),
     db: Database = Depends(get_db)

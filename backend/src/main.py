@@ -9,7 +9,7 @@ from src.config.settings import settings
 from src.database.connection import init_db, get_db, check_db_connection
 
 from src.applications.router import router as applications_router
-from src.auth.router import router as auth_router
+from src.modules.auth.router import router as auth_router
 from src.verification.router import router as verification_router
 from src.payment.router import router as payment_router
 from src.logs.router import router as logs_router
