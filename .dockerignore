@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python environment and caches
+backend/.venv
+backend/__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+backend/.pytest_cache
+backend/backups
+
+# Node / Frontend artifacts
+frontend/node_modules
+frontend/dist
+.npm
+
+# Environment & Config files
+.env
+backend/.env
+frontend/.env.local
+*.log
+
+# Deployment & Documentation
+*.md
+deploy-cloudrun.sh
+deploy-cloudrun.ps1
+cloudbuild.yaml
+docker-compose.yml

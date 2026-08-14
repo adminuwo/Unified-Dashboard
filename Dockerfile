@@ -29,12 +29,13 @@ COPY backend/ ./
 # Copy compiled Frontend dist assets into Backend directory
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
-# Expose backend port
-EXPOSE 8000
+# Expose container port (GCP Cloud Run defaults to 8080)
+EXPOSE 8080
 
 # Set production environment variables
 ENV ENVIRONMENT=production
-ENV PORT=8000
+ENV PORT=8080
 
-# Start Uvicorn production server
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start Uvicorn production server binding dynamically to $PORT
+CMD ["sh", "-c", "exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+

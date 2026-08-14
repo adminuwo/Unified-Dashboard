@@ -1,0 +1,21 @@
+# .gcloudignore file
+.gcloudignore
+.git
+.gitignore
+.github
+
+# Exclude local dependencies
+backend/.venv/
+**/node_modules/
+frontend/dist/
+
+# Exclude caches & temporary files
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+
+# Exclude environment files with secrets
+.env
+backend/.env
+frontend/.env.local
