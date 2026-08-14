@@ -3,36 +3,52 @@ import { useAuth } from '../context/AuthContext';
 
 export const AppDownloadsTab = () => {
   const { authFetch } = useAuth();
-  const [telemetry, setTelemetry] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [selectedApp, setSelectedApp] = useState('all');
   const [loading, setLoading] = useState(true);
 
-  const fetchTelemetry = async () => {
+  const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const url = selectedApp === 'all' ? '/api/telemetry/overview' : `/api/telemetry/overview?app_code=${selectedApp}`;
+      // Calculate a 30-day date range
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - 30);
+      
+      const startStr = start.toISOString().split('T')[0];
+      const endStr = end.toISOString().split('T')[0];
+      
+      const appCodes = selectedApp === 'all' ? 'aisa,ailegal' : selectedApp;
+      
+      const url = `/api/admin/analytics/google-play/overview?app_codes=${appCodes}&start_date=${startStr}&end_date=${endStr}`;
       const res = await authFetch(url);
       if (res.ok) {
         const data = await res.json();
-        setTelemetry(data);
+        setAnalytics(data.data);
       }
     } catch (err) {
-      console.error('Failed to fetch telemetry:', err);
+      console.error('Failed to fetch analytics:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTelemetry();
+    fetchAnalytics();
   }, [selectedApp]);
+
+  // Safely extract the combined stats from our new backend
+  const combined = analytics?.combined || {};
+  const totalDownloads = combined.daily_device_installs || 0;
+  const androidInstalls = combined.daily_device_installs || 0;
+  const iosInstalls = 0; // Coming soon in Phase 4!
 
   return (
     <div>
       {/* App Code Filter Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {['all', 'ailegal', 'aisa', 'aiads', 'uwoconnect', 'efvframework'].map((app) => (
+          {['all', 'ailegal', 'aisa'].map((app) => (
             <button
               key={app}
               onClick={() => setSelectedApp(app)}
@@ -61,8 +77,8 @@ export const AppDownloadsTab = () => {
             <span>Total App Downloads</span>
             <div className="metric-icon">📥</div>
           </div>
-          <div className="metric-value">{telemetry?.total_downloads || 0}</div>
-          <div className="metric-sub">Cumulative installs & downloads</div>
+          <div className="metric-value">{totalDownloads.toLocaleString()}</div>
+          <div className="metric-sub">Last 30 Days (Google Play)</div>
         </div>
 
         <div className="metric-card">
@@ -70,8 +86,8 @@ export const AppDownloadsTab = () => {
             <span>Android Installs</span>
             <div className="metric-icon">🤖</div>
           </div>
-          <div className="metric-value">{telemetry?.downloads_by_platform?.android || 0}</div>
-          <div className="metric-sub">Play Store & APK</div>
+          <div className="metric-value">{androidInstalls.toLocaleString()}</div>
+          <div className="metric-sub">Play Store Only</div>
         </div>
 
         <div className="metric-card">
@@ -79,10 +95,8 @@ export const AppDownloadsTab = () => {
             <span>iOS & Desktop</span>
             <div className="metric-icon">🍏</div>
           </div>
-          <div className="metric-value">
-            {(telemetry?.downloads_by_platform?.ios || 0) + (telemetry?.downloads_by_platform?.windows || 0)}
-          </div>
-          <div className="metric-sub">App Store & Windows EXE</div>
+          <div className="metric-value">{iosInstalls}</div>
+          <div className="metric-sub">App Store Analytics (Coming Phase 4)</div>
         </div>
       </div>
 
@@ -94,9 +108,9 @@ export const AppDownloadsTab = () => {
 
         {loading ? (
           <div style={{ color: 'var(--text-muted)' }}>Loading download metrics...</div>
-        ) : !telemetry?.downloads_by_platform || Object.keys(telemetry.downloads_by_platform).length === 0 ? (
+        ) : totalDownloads === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-            No download events recorded yet for selected filter.
+            No download events recorded in the last 30 days.
           </div>
         ) : (
           <table className="data-table">
@@ -108,27 +122,22 @@ export const AppDownloadsTab = () => {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(telemetry.downloads_by_platform).map(([platform, count], idx) => {
-                const percentage = telemetry.total_downloads > 0 ? ((count / telemetry.total_downloads) * 100).toFixed(1) : '0.0';
-                return (
-                  <tr key={idx}>
-                    <td>
-                      <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
-                        📱 {platform}
-                      </span>
-                    </td>
-                    <td>{count.toLocaleString()}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '100px', height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                          <div style={{ width: `${percentage}%`, height: '100%', backgroundColor: '#10b981' }} />
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#34d399' }}>{percentage}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              <tr>
+                <td>
+                  <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
+                    📱 android
+                  </span>
+                </td>
+                <td>{androidInstalls.toLocaleString()}</td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '100px', height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                      <div style={{ width: `100%`, height: '100%', backgroundColor: '#10b981' }} />
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#34d399' }}>100%</span>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         )}

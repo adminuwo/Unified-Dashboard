@@ -3,8 +3,7 @@ from pymongo.database import Database # type: ignore
 from typing import List, Optional
 
 from src.database.connection import get_db
-from src.middleware.authentication import get_current_user
-from src.database.models import User
+from src.admin.router import get_current_admin
 
 router = APIRouter(prefix="/api/admin/analytics", tags=["Analytics"])
 
@@ -14,7 +13,7 @@ def get_overview(
     start_date: str = Query(...),
     end_date: str = Query(...),
     db: Database = Depends(get_db),
-    user: User = Depends(get_current_user)
+    admin: str = Depends(get_current_admin)
 ):
     codes = app_codes.split(',')
     
@@ -117,7 +116,7 @@ def get_timeseries(
     end_date: str = Query(...),
     granularity: str = Query("day"),
     db: Database = Depends(get_db),
-    user: User = Depends(get_current_user)
+    admin: str = Depends(get_current_admin)
 ):
     codes = app_codes.split(',')
     
@@ -174,7 +173,7 @@ def get_timeseries(
 @router.get("/google-play/status")
 def get_status(
     db: Database = Depends(get_db),
-    user: User = Depends(get_current_user)
+    admin: str = Depends(get_current_admin)
 ):
     # Dummy status check
     return {

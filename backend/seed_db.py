@@ -23,8 +23,10 @@ def main():
             d = end_date - timedelta(days=i)
             date_str = d.strftime("%Y-%m-%d")
             
-            # Base installs
-            installs = 10 + i * 2 if app["app_code"] == "aisa" else 5 + i
+            # Base installs (targeting ~110 total for AISA over 30 days)
+            installs = 3 if app["app_code"] == "aisa" else 2
+            if i % 3 == 0 and app["app_code"] == "aisa":
+                installs += 1
             uninstalls = int(installs * 0.2)
             
             doc = {
