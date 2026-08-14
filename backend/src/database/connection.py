@@ -13,15 +13,15 @@ def get_client() -> pymongo.MongoClient:
     global _client, _last_db_error, _is_mongomock
     if _client is None:
         try:
-            mongo_kwargs = {
+            mongo_kwargs: dict = {
                 "serverSelectionTimeoutMS": 10000,
-                "tlsAllowInvalidCertificates": True,
             }
             try:
                 import certifi
                 mongo_kwargs["tlsCAFile"] = certifi.where()
             except ImportError:
                 pass
+
 
             client = pymongo.MongoClient(settings.MONGODB_URL, **mongo_kwargs)
             # Test ping to verify cluster reachability
