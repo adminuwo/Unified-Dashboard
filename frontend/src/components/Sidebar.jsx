@@ -8,7 +8,6 @@ export const Sidebar = ({ currentTab, setTab }) => {
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'overlap', label: 'App Analytics', icon: '📈' },
     { id: 'auth_tester', label: 'Auth Service', icon: '🔒' },
-    { id: 'store_analytics', label: 'Store Analytics', icon: '📱' },
     { id: 'applications', label: 'Application Keys', icon: '🔑' },
     { id: 'chat_tracking', label: 'Chat Tracking', icon: '💬' },
     { id: 'app_downloads', label: 'App Downloads', icon: '📥' },
