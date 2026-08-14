@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Dict, Any
 import pymongo  # type: ignore
 from pymongo.database import Database  # type: ignore
 
@@ -13,7 +13,16 @@ def get_client() -> pymongo.MongoClient:
     global _client, _last_db_error, _is_mongomock
     if _client is None:
         try:
-            client = pymongo.MongoClient(settings.MONGODB_URL, serverSelectionTimeoutMS=10000)
+            mongo_kwargs: Dict[str, Any] = {
+                "serverSelectionTimeoutMS": 10000,
+                "tlsAllowInvalidCertificates": True,
+            }
+            try:
+                import certifi
+                mongo_kwargs["tlsCAFile"] = certifi.where()
+            except ImportError:
+                pass
+            client = pymongo.MongoClient(settings.MONGODB_URL, **mongo_kwargs)
 
             # Test ping to verify cluster reachability
             client.admin.command('ping')
@@ -78,16 +87,6 @@ def init_db(db: Database | None = None):
         db["app_downloads"].create_index([("created_at", pymongo.DESCENDING)])
         db["app_downloads"].create_index("app_code")
         db["app_downloads"].create_index("platform")
-
-        db["store_analytics"].create_index([
-            ("project", 1),
-            ("platform", 1),
-            ("package_name", 1),
-            ("date", 1),
-            ("metric", 1)
-        ], unique=True)
-        db["store_analytics"].create_index("project")
-        db["store_analytics"].create_index("date")
     except Exception as e:
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
 

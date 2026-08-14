@@ -177,7 +177,7 @@ class AuthService:
         if not user_id:
             return {"valid": False, "message": "Missing user identification in token"}
 
-        user = self.repo.get_user_by_id(user_id)
+        user = self.repo.get_user_by_id(str(user_id))
         if not user or not user.get("is_active", True):
             return {"valid": False, "message": "User inactive or not found"}
 
@@ -199,7 +199,7 @@ class AuthService:
             )
 
         user_id = payload.get("sub")
-        user = self.repo.get_user_by_id(user_id)
+        user = self.repo.get_user_by_id(str(user_id)) if user_id else None
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

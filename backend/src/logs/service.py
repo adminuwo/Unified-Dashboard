@@ -40,7 +40,7 @@ def redact_metadata(metadata: Optional[Dict[str, Any]]) -> Optional[Dict[str, An
     if not isinstance(metadata, dict):
         return metadata
 
-    redacted = {}
+    redacted: Dict[str, Any] = {}
     sensitive_terms = ["password", "api_key", "access_token", "secret"]
 
     for k, v in metadata.items():

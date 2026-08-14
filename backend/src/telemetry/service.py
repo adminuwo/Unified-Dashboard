@@ -59,7 +59,7 @@ def get_telemetry_overview(
         query_filter["app_code"] = app_code.lower()
 
     # Total unique chat sessions & total tokens
-    pipeline_chat = [
+    pipeline_chat: List[Dict[str, Any]] = [
         {"$match": query_filter},
         {
             "$group": {
@@ -79,7 +79,7 @@ def get_telemetry_overview(
     downloads_filter = {"app_code": app_code.lower()} if app_code and app_code.lower() != "all" else {}
     total_downloads = db["app_downloads"].count_documents(downloads_filter)
 
-    platform_pipeline = [
+    platform_pipeline: List[Dict[str, Any]] = [
         {"$match": downloads_filter},
         {"$group": {"_id": "$platform", "count": {"$sum": 1}}}
     ]
@@ -87,7 +87,7 @@ def get_telemetry_overview(
     downloads_by_platform = {p["_id"]: p["count"] for p in platform_agg if p.get("_id")}
 
     # AI Model Share
-    model_pipeline = [
+    model_pipeline: List[Dict[str, Any]] = [
         {"$match": query_filter},
         {"$group": {"_id": "$model_name", "count": {"$sum": 1}, "tokens": {"$sum": "$total_tokens"}}},
         {"$sort": {"count": -1}}
