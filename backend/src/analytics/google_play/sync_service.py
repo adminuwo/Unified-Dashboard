@@ -58,10 +58,10 @@ def run_sync(db: Database, apps: List[Dict[str, str]], bucket_name: str,
                 
                 # Download and parse
                 content = blob.download_as_bytes()
-                headers, rows, encoding, fingerprint = parse_play_report(content)
+                headers, normalized_headers, rows, encoding, fingerprint = parse_play_report(content)
                 
                 # Validate schema
-                validate_schema(headers)
+                validate_schema(normalized_headers)
                 
                 # Process rows
                 metrics_to_insert = []

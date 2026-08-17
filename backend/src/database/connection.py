@@ -52,7 +52,8 @@ def get_db() -> Generator[Database, None, None]:
 
 
 def init_db(db: Database | None = None):
-    """Initialize database collection indexes and seed default master admin user & sample data."""
+    """Initialize database collection indexes."""
+
     if db is None:
         client = get_client()
         db = client[settings.MONGODB_DB_NAME]
@@ -91,75 +92,7 @@ def init_db(db: Database | None = None):
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
 
 
-    # Seed 4 official master admin users
-    try:
-        from src.auth.service import hash_password
-        admin_credentials = [
-            ("super.admin@unified.com", "@xQn!W&Wg-ufSWn)93Qg_0S2"),
-            ("sec.ops@unified.com", "#re(QpHtdse=re=mZK7ZzJ5O"),
-            ("sys.auditor@unified.com", "nYtEt_e5M*8CvW6a%_^_bfk*"),
-            ("devops.lead@unified.com", "R7wqmG$=XmbqfXEoDGnU7Sfw")
-        ]
-
-        # Clean up legacy test admin user if present
-        db["admin_users"].delete_many({"username": "admin"})
-
-        for email, plain_pass in admin_credentials:
-            clean_email = email.strip().lower()
-            existing = db["admin_users"].find_one({"username": clean_email})
-            if not existing:
-                db["admin_users"].insert_one({
-                    "username": clean_email,
-                    "password_hash": hash_password(plain_pass),
-                    "role": "admin",
-                    "is_active": True
-                })
-            else:
-                db["admin_users"].update_one(
-                    {"username": clean_email},
-                    {"$set": {
-                        "password_hash": hash_password(plain_pass),
-                        "role": "admin",
-                        "is_active": True
-                    }}
-                )
-        print("[init_db] 4 official admin accounts seeded successfully.")
-    except Exception as e:
-        print(f"[init_db] Admin seeding note: {e}")
-
-    # Seed 5 master application API keys
-    try:
-        from src.middleware.authentication import hash_api_key
-        apps_to_seed = [
-            ("app_key_ailegal_1001", "AI Legal", "ailegal", "key_ailegal_live_master_2026"),
-            ("app_key_aisa_2001", "AISA Assistant", "aisa", "key_aisa_live_master_2026"),
-            ("app_key_aiads_3001", "AI Ads Generator", "aiads", "key_aiads_live_master_2026"),
-            ("app_key_uwoconnect_4001", "UWO Connect", "uwoconnect", "key_uwoconnect_live_master_2026"),
-            ("app_key_efvframework_5001", "EFV Framework", "efvframework", "key_efvframework_live_master_2026"),
-        ]
-        for key_id, app_name, app_code, plain_key in apps_to_seed:
-            key_hash = hash_api_key(plain_key)
-            existing = db["application_keys"].find_one({"app_code": app_code})
-            if not existing:
-                db["application_keys"].insert_one({
-                    "_id": key_id,
-                    "application_name": app_name,
-                    "app_code": app_code,
-                    "api_key_hash": key_hash,
-                    "status": "active"
-                })
-            else:
-                db["application_keys"].update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": {
-                        "application_name": app_name,
-                        "app_code": app_code,
-                        "api_key_hash": key_hash,
-                        "status": "active"
-                    }}
-                )
-    except Exception as e:
-        print(f"[init_db] App keys seeding note: {e}")
+# Seeding of admin users and application keys has been removed per request.
 
 
 

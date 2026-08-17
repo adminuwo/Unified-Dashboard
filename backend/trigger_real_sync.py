@@ -4,12 +4,12 @@ from src.config.settings import settings
 from src.analytics.google_play.sync_service import run_sync
 
 def run_real_sync():
-    print("Clearing dummy data...")
+    print("Clearing old play_install_metrics data...")
     client = get_client()
     db = client[settings.MONGODB_DB_NAME]
     
     result = db["play_install_metrics"].delete_many({})
-    print(f"Deleted {result.deleted_count} dummy records.")
+    print(f"Deleted {result.deleted_count} old records.")
     
     print("Running real Google Play sync...")
     apps = [

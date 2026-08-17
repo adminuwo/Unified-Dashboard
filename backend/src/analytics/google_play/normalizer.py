@@ -39,7 +39,7 @@ def normalize_row(row: Dict[str, str], package_name: str, metric_date: str, dime
         "dimension_value": dim_val,
         "dimension_value_normalized": dim_norm,
         "current_device_installs": safe_int(row.get('current device installs', 0)),
-        "installs_on_active_devices": safe_int(row.get('installs on active devices', 0)),
+        "installs_on_active_devices": safe_int(row.get('active device installs', row.get('installs on active devices', 0))),
         "daily_device_installs": safe_int(row.get('daily device installs', 0)),
         "daily_device_uninstalls": safe_int(row.get('daily device uninstalls', 0)),
         "daily_device_upgrades": safe_int(row.get('daily device upgrades', 0)),
@@ -47,6 +47,9 @@ def normalize_row(row: Dict[str, str], package_name: str, metric_date: str, dime
         "total_user_installs": safe_int(row.get('total user installs', 0)),
         "daily_user_installs": safe_int(row.get('daily user installs', 0)),
         "daily_user_uninstalls": safe_int(row.get('daily user uninstalls', 0)),
+        "install_events": safe_int(row.get('install events', 0)),
+        "uninstall_events": safe_int(row.get('uninstall events', 0)),
+        "update_events": safe_int(row.get('update events', 0)),
         
         # Derived
         "net_daily_device_installs": safe_int(row.get('daily device installs', 0)) - safe_int(row.get('daily device uninstalls', 0)),

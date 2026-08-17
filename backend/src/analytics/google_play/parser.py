@@ -57,4 +57,4 @@ def parse_play_report(content_bytes: bytes):
         row_dict = dict(zip(normalized_headers, row))
         rows.append(row_dict)
         
-    return headers, rows, encoding, fingerprint
+    return headers, normalized_headers, rows, encoding, fingerprint
