@@ -28,11 +28,13 @@ export const AppDownloadsTab = () => {
   const { authFetch } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [timeseriesData, setTimeseriesData] = useState({
-    user_loss: [],
-    total_installs: [],
-    active_devices: []
+    user_loss: { android: [], ios: [] },
+    total_installs: { android: [], ios: [] },
+    active_devices: { android: [], ios: [] }
   });
   const [selectedApp, setSelectedApp] = useState('all');
+  const [showAndroid, setShowAndroid] = useState(true);
+  const [showIos, setShowIos] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const fetchAnalytics = async () => {
@@ -57,9 +59,9 @@ export const AppDownloadsTab = () => {
         const activeData = await activeRes.json();
 
         setTimeseriesData({
-          user_loss: lossData.data?.series?.[0]?.points || [],
-          total_installs: installsData.data?.series?.[0]?.points || [],
-          active_devices: activeData.data?.series?.[0]?.points || []
+          user_loss: { android: lossData.data?.android || [], ios: lossData.data?.ios || [] },
+          total_installs: { android: installsData.data?.android || [], ios: installsData.data?.ios || [] },
+          active_devices: { android: activeData.data?.android || [], ios: activeData.data?.ios || [] }
         });
       }
     } catch (err) {
@@ -78,35 +80,70 @@ export const AppDownloadsTab = () => {
   const totalDownloads = combined.daily_device_installs || 0;
   const androidInstalls = combined.daily_device_installs || 0;
   const userInstalls = combined.daily_user_installs || 0;
+  const iosDownloads = combined.ios_total_downloads || 0;
 
-  // Chart configs helper
-  const makeMiniChart = (dataPoints, label, color, fill = false) => {
-    const dates = dataPoints.map(p => {
-      const d = new Date(p.date);
+  // Chart configs helper that combines Android & iOS in the same chart with legend toggles
+  const makeCombinedChart = (seriesObj) => {
+    const androidPts = seriesObj?.android || [];
+    const iosPts = seriesObj?.ios || [];
+
+    // Union of all dates
+    const allDatesSet = new Set([
+      ...androidPts.map(p => p.date),
+      ...iosPts.map(p => p.date)
+    ]);
+    const sortedDates = Array.from(allDatesSet).sort();
+
+    const labels = sortedDates.map(dateStr => {
+      const d = new Date(dateStr);
       return `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`;
     });
-    const values = dataPoints.map(p => p.value);
+
+    const androidMap = Object.fromEntries(androidPts.map(p => [p.date, p.value]));
+    const iosMap = Object.fromEntries(iosPts.map(p => [p.date, p.value]));
+
+    const datasets = [];
+
+    if (showAndroid) {
+      datasets.push({
+        label: 'Android (Play Store)',
+        data: sortedDates.map(d => androidMap[d] ?? 0),
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2
+      });
+    }
+
+    if (showIos) {
+      datasets.push({
+        label: 'iOS (App Store)',
+        data: sortedDates.map(d => iosMap[d] ?? 0),
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2
+      });
+    }
 
     return {
       data: {
-        labels: dates,
-        datasets: [{
-          label,
-          data: values,
-          borderColor: color,
-          backgroundColor: fill ? `${color}20` : 'transparent',
-          fill: fill,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          borderWidth: 2
-        }]
+        labels,
+        datasets
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: false // We use custom interactable buttons
+          },
           tooltip: {
             mode: 'index',
             intersect: false,
@@ -123,7 +160,7 @@ export const AppDownloadsTab = () => {
             ticks: {
               color: '#64748b',
               font: { size: 10 },
-              maxTicksLimit: 4
+              maxTicksLimit: 5
             }
           },
           y: {
@@ -139,14 +176,15 @@ export const AppDownloadsTab = () => {
     };
   };
 
-  const userLossChart = makeMiniChart(timeseriesData.user_loss, 'User loss', '#38bdf8');
-  const totalInstallsChart = makeMiniChart(timeseriesData.total_installs, 'Total installs', '#0284c7', true);
-  const activeDevicesChart = makeMiniChart(timeseriesData.active_devices, 'Active devices', '#0ea5e9');
+  const userLossChart = makeCombinedChart(timeseriesData.user_loss);
+  const totalInstallsChart = makeCombinedChart(timeseriesData.total_installs);
+  const activeDevicesChart = makeCombinedChart(timeseriesData.active_devices);
 
   return (
     <div>
-      {/* App Code Filter Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      {/* App Code Filter Bar & Platform Toggle Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        {/* App selector */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {['all', 'ailegal', 'aisa'].map((app) => (
             <button
@@ -168,33 +206,112 @@ export const AppDownloadsTab = () => {
             </button>
           ))}
         </div>
+
+        {/* Interactable Platform Legend Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', marginRight: '4px' }}>Graph Layers:</span>
+          
+          <button
+            onClick={() => setShowAndroid(!showAndroid)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: '8px',
+              border: showAndroid ? '1px solid #10b981' : '1px solid transparent',
+              backgroundColor: showAndroid ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+              color: showAndroid ? '#34d399' : '#64748b',
+              fontSize: '12px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: showAndroid ? '#10b981' : '#475569' }} />
+            🤖 Android
+          </button>
+
+          <button
+            onClick={() => setShowIos(!showIos)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: '8px',
+              border: showIos ? '1px solid #38bdf8' : '1px solid transparent',
+              backgroundColor: showIos ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              color: showIos ? '#38bdf8' : '#64748b',
+              fontSize: '12px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: showIos ? '#38bdf8' : '#475569' }} />
+            🍏 iOS
+          </button>
+        </div>
       </div>
 
-      {/* Google Play Monitor KPI Trends Section */}
+      {/* Cross-Platform Summary Overview Cards */}
+      <div className="metrics-grid" style={{ marginBottom: '24px' }}>
+        <div className="metric-card">
+          <div className="metric-header">
+            <span>Total Combined Downloads</span>
+            <div className="metric-icon">📥</div>
+          </div>
+          <div className="metric-value">{(totalDownloads + iosDownloads).toLocaleString()}</div>
+          <div className="metric-sub">Android ({androidInstalls}) + iOS ({iosDownloads})</div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-header">
+            <span>Android (Play Store)</span>
+            <div className="metric-icon">🤖</div>
+          </div>
+          <div className="metric-value">{androidInstalls.toLocaleString()}</div>
+          <div className="metric-sub">{combined.active_device_installs_latest || 0} active devices ({userInstalls} users)</div>
+        </div>
+
+        <div className="metric-card" style={{ borderColor: 'rgba(56, 189, 248, 0.4)', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(15, 23, 42, 0.6) 100%)' }}>
+          <div className="metric-header">
+            <span>Apple App Store (iOS)</span>
+            <div className="metric-icon">🍏</div>
+          </div>
+          <div className="metric-value" style={{ color: '#38bdf8' }}>{iosDownloads.toLocaleString()}</div>
+          <div className="metric-sub">{combined.ios_first_time_downloads || 0} 1st time • {combined.ios_redownloads || 0} redownloads • {combined.ios_page_views || 0} views</div>
+        </div>
+      </div>
+
+      {/* Unified Telemetry Trend Graphs Section with Multi-platform curves */}
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            📊 Monitor KPI trends <span style={{ fontSize: '12px', fontWeight: '500', color: '#94a3b8' }}>• Google Play Official Telemetry</span>
+            📊 Unified Telemetry Trends
+            <span style={{ fontSize: '11px', fontWeight: '600', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>Android</span>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>iOS</span>
           </h3>
-          <span style={{ fontSize: '12px', color: '#64748b' }}>📅 Daily Series</span>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>📅 Multi-platform overlay</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-          {/* Card 1: User loss */}
+          {/* Card 1: User loss / Uninstalls */}
           <div className="metric-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>User loss</span>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
-                  {combined.avg_daily_user_loss || 0} <span style={{ fontSize: '13px', fontWeight: '500', color: '#94a3b8' }}>average</span>
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>User Loss / Uninstalls</span>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
+                  {combined.avg_daily_user_loss || 0} <span style={{ fontSize: '12px', fontWeight: '500', color: '#94a3b8' }}>Android avg</span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '2px', fontWeight: '600' }}>
-                  📉 Total {combined.daily_user_uninstalls || 0} uninstalls recorded
+                  Total {combined.daily_user_uninstalls || 0} Android uninstalls • {combined.ios_redownloads || 0} iOS churn
                 </div>
               </div>
               <div className="metric-icon" style={{ fontSize: '18px' }}>📉</div>
             </div>
-            <div style={{ height: '140px', marginTop: '12px' }}>
+            <div style={{ height: '150px', marginTop: '12px' }}>
               <Line data={userLossChart.data} options={userLossChart.options} />
             </div>
           </div>
@@ -203,36 +320,36 @@ export const AppDownloadsTab = () => {
           <div className="metric-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total installs</span>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
-                  {totalDownloads.toLocaleString()}
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total Cumulative Installs</span>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
+                  {(totalDownloads + iosDownloads).toLocaleString()}
                 </div>
                 <div style={{ fontSize: '12px', color: '#34d399', marginTop: '2px', fontWeight: '600' }}>
-                  ↑ {userInstalls} unique user accounts
+                  🤖 {androidInstalls} Play Store • 🍏 {iosDownloads} App Store
                 </div>
               </div>
               <div className="metric-icon" style={{ fontSize: '18px' }}>📥</div>
             </div>
-            <div style={{ height: '140px', marginTop: '12px' }}>
+            <div style={{ height: '150px', marginTop: '12px' }}>
               <Line data={totalInstallsChart.data} options={totalInstallsChart.options} />
             </div>
           </div>
 
-          {/* Card 3: Active devices */}
+          {/* Card 3: Active devices & Reach */}
           <div className="metric-card" style={{ padding: '18px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Active devices</span>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
-                  {combined.avg_active_devices || 0} <span style={{ fontSize: '13px', fontWeight: '500', color: '#94a3b8' }}>average</span>
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Active Devices / Reach</span>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', marginTop: '4px' }}>
+                  {combined.active_device_installs_latest || 0} <span style={{ fontSize: '12px', fontWeight: '500', color: '#94a3b8' }}>Android Active</span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#34d399', marginTop: '2px', fontWeight: '600' }}>
-                  📱 {combined.active_device_installs_latest || 0} latest active devices
+                <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '2px', fontWeight: '600' }}>
+                  📱 {combined.avg_active_devices || 0} avg devices • {combined.ios_first_time_downloads || 0} 1st time iOS
                 </div>
               </div>
               <div className="metric-icon" style={{ fontSize: '18px' }}>📱</div>
             </div>
-            <div style={{ height: '140px', marginTop: '12px' }}>
+            <div style={{ height: '150px', marginTop: '12px' }}>
               <Line data={activeDevicesChart.data} options={activeDevicesChart.options} />
             </div>
           </div>
@@ -264,10 +381,11 @@ export const AppDownloadsTab = () => {
               </tr>
             </thead>
             <tbody>
+              {/* Android Row */}
               <tr>
                 <td>
                   <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
-                    📱 android
+                    🤖 android (Google Play)
                   </span>
                 </td>
                 <td>{androidInstalls.toLocaleString()}</td>
@@ -277,9 +395,34 @@ export const AppDownloadsTab = () => {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '100px', height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                      <div style={{ width: `100%`, height: '100%', backgroundColor: '#10b981' }} />
+                      <div style={{ width: `${totalDownloads + (combined.ios_total_downloads || 0) > 0 ? Math.round((androidInstalls / (totalDownloads + (combined.ios_total_downloads || 0))) * 100) : 100}%`, height: '100%', backgroundColor: '#10b981' }} />
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#34d399' }}>100%</span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#34d399' }}>
+                      {totalDownloads + (combined.ios_total_downloads || 0) > 0 ? Math.round((androidInstalls / (totalDownloads + (combined.ios_total_downloads || 0))) * 100) : 100}%
+                    </span>
+                  </div>
+                </td>
+              </tr>
+
+              {/* iOS Row */}
+              <tr>
+                <td>
+                  <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
+                    🍏 iOS (App Store)
+                  </span>
+                </td>
+                <td>{(combined.ios_total_downloads || 0).toLocaleString()}</td>
+                <td style={{ color: '#34d399', fontWeight: '600' }}>{combined.ios_first_time_downloads || 0} (1st time)</td>
+                <td style={{ color: '#38bdf8', fontWeight: '600' }}>{combined.ios_redownloads || 0} (redownloads)</td>
+                <td style={{ color: '#94a3b8' }}>{combined.ios_page_views || 0} views</td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '100px', height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                      <div style={{ width: `${totalDownloads + (combined.ios_total_downloads || 0) > 0 ? Math.round(((combined.ios_total_downloads || 0) / (totalDownloads + (combined.ios_total_downloads || 0))) * 100) : 0}%`, height: '100%', backgroundColor: '#38bdf8' }} />
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#38bdf8' }}>
+                      {totalDownloads + (combined.ios_total_downloads || 0) > 0 ? Math.round(((combined.ios_total_downloads || 0) / (totalDownloads + (combined.ios_total_downloads || 0))) * 100) : 0}%
+                    </span>
                   </div>
                 </td>
               </tr>

@@ -3,14 +3,13 @@ import jwt
 
 class AppStoreConnectAuth:
     def __init__(self, issuer_id: str, key_id: str, private_key: str):
-        self.issuer_id = issuer_id
-        self.key_id = key_id
-        self.private_key = private_key
+        self.issuer_id = issuer_id.strip()
+        self.key_id = key_id.strip()
+        self.private_key = private_key.strip()
         
     def generate_token(self, expiration_minutes: int = 10) -> str:
         """
-        Generate an ES256 signed JWT for the App Store Connect API.
-        The token includes the issuer ID, issue time, expiration time, and audience.
+        Generate an ES256 signed JWT for the App Store Connect API using PyJWT.
         """
         now = int(time.time())
         exp = now + (expiration_minutes * 60)
@@ -28,7 +27,6 @@ class AppStoreConnectAuth:
             "aud": "appstoreconnect-v1"
         }
         
-        # Use pyjwt to encode and sign the token
         token = jwt.encode(
             payload=payload,
             key=self.private_key,
@@ -36,4 +34,4 @@ class AppStoreConnectAuth:
             headers=headers
         )
         
-        return token
+        return token if isinstance(token, str) else token.decode("utf-8")

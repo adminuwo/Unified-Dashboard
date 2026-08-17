@@ -159,11 +159,20 @@ export const Overview = () => {
 
         <div className="metric-card">
           <div className="metric-header">
-            <span>App Downloads</span>
-            <div className="metric-icon">📥</div>
+            <span>Google Play Installs</span>
+            <div className="metric-icon">🤖</div>
           </div>
           <div className="metric-value">{playAnalytics?.combined?.daily_device_installs || telemetry?.total_downloads || 0}</div>
-          <div className="metric-sub">All-Time Google Play Downloads</div>
+          <div className="metric-sub">Android Devices (Google Play)</div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-header">
+            <span>App Store Downloads</span>
+            <div className="metric-icon">🍏</div>
+          </div>
+          <div className="metric-value">{playAnalytics?.combined?.ios_total_downloads || 0}</div>
+          <div className="metric-sub">iOS Devices (App Store Connect)</div>
         </div>
 
         <div className="metric-card">

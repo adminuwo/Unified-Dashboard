@@ -78,6 +78,14 @@ def get_overview(
         )
         current_active = latest_doc.get("installs_on_active_devices", 0) if latest_doc else 0
 
+        # Query iOS downloads for this app
+        ios_records = list(db["app_store_metrics"].find({"app_code": res["_id"]}))
+        ios_total = sum(r.get("total_downloads", 0) for r in ios_records)
+        ios_first_time = sum(r.get("first_time_downloads", 0) for r in ios_records)
+        ios_redownloads = sum(r.get("redownloads", 0) for r in ios_records)
+        ios_views = sum(r.get("page_views", 0) for r in ios_records)
+        ios_impressions = sum(r.get("impressions", 0) for r in ios_records)
+
         apps_data.append({
             "app_code": res["_id"],
             "display_name": res["_id"].upper(),
@@ -92,6 +100,11 @@ def get_overview(
             "active_device_installs_latest": current_active,
             "avg_active_devices": round(float(res.get("avg_active_devices") or 0.0), 1),
             "avg_daily_user_loss": round(float(res.get("avg_daily_user_loss") or 0.0), 2),
+            "ios_total_downloads": ios_total,
+            "ios_first_time_downloads": ios_first_time,
+            "ios_redownloads": ios_redownloads,
+            "ios_page_views": ios_views,
+            "ios_impressions": ios_impressions,
             "snapshot_as_of_date": end_date
         })
         # Add to combined
@@ -107,6 +120,17 @@ def get_overview(
         combined["active_device_installs_latest"] += current_active
         combined["avg_active_devices"] = round(float(res.get("avg_active_devices") or 0.0), 1)
         combined["avg_daily_user_loss"] = round(float(res.get("avg_daily_user_loss") or 0.0), 2)
+        if "ios_total_downloads" not in combined:
+            combined["ios_total_downloads"] = 0
+            combined["ios_first_time_downloads"] = 0
+            combined["ios_redownloads"] = 0
+            combined["ios_page_views"] = 0
+            combined["ios_impressions"] = 0
+        combined["ios_total_downloads"] += ios_total
+        combined["ios_first_time_downloads"] += ios_first_time
+        combined["ios_redownloads"] += ios_redownloads
+        combined["ios_page_views"] += ios_views
+        combined["ios_impressions"] += ios_impressions
 
     # If DB is empty (i.e. sync hasn't run yet due to permissions), fallback to 0
     if not apps_data:
@@ -171,41 +195,61 @@ def get_timeseries(
     elif end_date:
         match_filter["metric_date"] = {"$lte": end_date}
 
-    # Fetch all records ordered by date
-    records = list(db["play_install_metrics"].find(match_filter).sort("metric_date", 1))
+    # Fetch Google Play (Android) records
+    play_records = list(db["play_install_metrics"].find(match_filter).sort("metric_date", 1))
 
-    series_map: dict = {code: [] for code in codes}
-    cum_totals: dict = {code: 0 for code in codes}
+    # Fetch Apple App Store (iOS) records
+    ios_filter: dict = {"app_code": {"$in": codes}}
+    if start_date and end_date:
+        ios_filter["metric_date"] = {"$gte": start_date, "$lte": end_date}
+    elif start_date:
+        ios_filter["metric_date"] = {"$gte": start_date}
+    elif end_date:
+        ios_filter["metric_date"] = {"$lte": end_date}
 
-    for r in records:
-        code = r.get("app_code")
-        if code not in series_map:
-            series_map[code] = []
-            cum_totals[code] = 0
+    ios_records = list(db["app_store_metrics"].find(ios_filter).sort("metric_date", 1))
 
+    android_points = []
+    android_cum = 0
+    for r in play_records:
         date_val = r.get("metric_date")
         if metric == "total_installs":
-            cum_totals[code] += r.get("daily_device_installs", 0)
-            val = cum_totals[code]
+            android_cum += r.get("daily_device_installs", 0)
+            val = android_cum
         elif metric in ["active_devices", "active_device_installs"]:
             val = r.get("installs_on_active_devices", 0)
         elif metric in ["user_loss", "daily_user_uninstalls"]:
             val = r.get("daily_user_uninstalls", 0)
-        elif metric == "daily_user_installs":
-            val = r.get("daily_user_installs", 0)
         else:
             val = r.get("daily_device_installs", 0)
+        android_points.append({"date": date_val, "value": val})
 
-        series_map[code].append({"date": date_val, "value": val})
-
-    series = [{"app_code": k, "points": v} for k, v in series_map.items()]
+    ios_points = []
+    ios_cum = 0
+    for r in ios_records:
+        date_val = r.get("metric_date")
+        if metric == "total_installs":
+            ios_cum += r.get("total_downloads", 0)
+            val = ios_cum
+        elif metric in ["active_devices", "active_device_installs"]:
+            val = r.get("first_time_downloads", 0)
+        elif metric in ["user_loss", "daily_user_uninstalls"]:
+            val = r.get("redownloads", 0)
+        else:
+            val = r.get("total_downloads", 0)
+        ios_points.append({"date": date_val, "value": val})
 
     return {
         "data": {
             "metric": metric,
             "aggregation": "sum",
             "granularity": granularity,
-            "series": series
+            "android": android_points,
+            "ios": ios_points,
+            "series": [
+                {"platform": "android", "name": "Android (Google Play)", "points": android_points},
+                {"platform": "ios", "name": "iOS (App Store)", "points": ios_points}
+            ]
         },
         "meta": {
             "source_timezone": "America/Los_Angeles",
