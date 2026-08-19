@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional, List
 
 
@@ -99,7 +99,7 @@ class User(MongoModel):
         return self._data.get("subscriptions", [])
 
 
-VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "general"}
+VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "uwo", "general"}
 
 
 class ApplicationKey(MongoModel):
@@ -607,6 +607,225 @@ class StoreAnalytics(MongoModel):
     @property
     def source(self) -> str:
         return self._data.get("source", "google_play_reporting_api")
+
+    @property
+    def created_at(self) -> datetime:
+        return self._data.get("created_at") or utc_now()
+
+    @property
+    def updated_at(self) -> datetime:
+        return self._data.get("updated_at") or utc_now()
+
+
+class AnalyticsCache(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        cache_key: str,
+        data: Any,
+        ttl_seconds: int = 3600,
+        record_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        expires_at = now + timedelta(seconds=ttl_seconds)
+        return {
+            "_id": record_id or generate_uuid(),
+            "cache_key": cache_key,
+            "data": data,
+            "updated_at": now,
+            "expires_at": expires_at
+        }
+
+    @property
+    def cache_key(self) -> str:
+        return self._data.get("cache_key", "")
+
+    @property
+    def data(self) -> Any:
+        return self._data.get("data")
+
+    @property
+    def updated_at(self) -> datetime:
+        return self._data.get("updated_at") or utc_now()
+
+    @property
+    def expires_at(self) -> datetime:
+        return self._data.get("expires_at") or utc_now()
+
+
+class EventLog(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        app_code: str,
+        event_type: str,
+        path: Optional[str] = None,
+        visitor_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        device: str = "desktop",
+        browser: str = "other",
+        os_name: str = "other",
+        country: str = "IN",
+        event_name: Optional[str] = None,
+        event_data: Optional[Dict[str, Any]] = None,
+        duration_seconds: Optional[float] = None,
+        user_id: Optional[str] = None,
+        entry_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": entry_id or generate_uuid(),
+            "app_code": app_code.lower(),
+            "event_type": event_type.lower(),
+            "path": path or "/",
+            "visitor_id": visitor_id or generate_uuid(),
+            "session_id": session_id or generate_uuid(),
+            "device": device.lower(),
+            "browser": browser,
+            "os": os_name,
+            "country": country.upper(),
+            "event_name": event_name,
+            "event_data": event_data or {},
+            "duration_seconds": duration_seconds or 0.0,
+            "user_id": user_id,
+            "created_at": now,
+        }
+
+    @property
+    def app_code(self) -> str:
+        return self._data.get("app_code", "general")
+
+    @property
+    def event_type(self) -> str:
+        return self._data.get("event_type", "pageview")
+
+    @property
+    def path(self) -> str:
+        return self._data.get("path", "/")
+
+    @property
+    def visitor_id(self) -> str:
+        return self._data.get("visitor_id", "")
+
+    @property
+    def session_id(self) -> str:
+        return self._data.get("session_id", "")
+
+    @property
+    def device(self) -> str:
+        return self._data.get("device", "desktop")
+
+    @property
+    def browser(self) -> str:
+        return self._data.get("browser", "other")
+
+    @property
+    def os(self) -> str:
+        return self._data.get("os", "other")
+
+    @property
+    def country(self) -> str:
+        return self._data.get("country", "IN")
+
+    @property
+    def event_name(self) -> Optional[str]:
+        return self._data.get("event_name")
+
+    @property
+    def event_data(self) -> Dict[str, Any]:
+        return self._data.get("event_data", {})
+
+    @property
+    def duration_seconds(self) -> float:
+        return float(self._data.get("duration_seconds", 0.0))
+
+    @property
+    def user_id(self) -> Optional[str]:
+        return self._data.get("user_id")
+
+    @property
+    def created_at(self) -> datetime:
+        return self._data.get("created_at") or utc_now()
+
+
+class DailyMetric(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        date_str: str,
+        app_code: str,
+        platform: str,
+        active_users: int = 0,
+        pageviews: int = 0,
+        sessions: int = 0,
+        installs: int = 0,
+        uninstalls: int = 0,
+        revenue: float = 0.0,
+        avg_latency_ms: float = 0.0,
+        error_rate: float = 0.0,
+        metric_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": metric_id or generate_uuid(),
+            "date": date_str,
+            "app_code": app_code.lower(),
+            "platform": platform.lower(),
+            "active_users": active_users,
+            "pageviews": pageviews,
+            "sessions": sessions,
+            "installs": installs,
+            "uninstalls": uninstalls,
+            "revenue": float(revenue),
+            "avg_latency_ms": float(avg_latency_ms),
+            "error_rate": float(error_rate),
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    @property
+    def date(self) -> str:
+        return self._data.get("date", "")
+
+    @property
+    def app_code(self) -> str:
+        return self._data.get("app_code", "general")
+
+    @property
+    def platform(self) -> str:
+        return self._data.get("platform", "web")
+
+    @property
+    def active_users(self) -> int:
+        return int(self._data.get("active_users", 0))
+
+    @property
+    def pageviews(self) -> int:
+        return int(self._data.get("pageviews", 0))
+
+    @property
+    def sessions(self) -> int:
+        return int(self._data.get("sessions", 0))
+
+    @property
+    def installs(self) -> int:
+        return int(self._data.get("installs", 0))
+
+    @property
+    def uninstalls(self) -> int:
+        return int(self._data.get("uninstalls", 0))
+
+    @property
+    def revenue(self) -> float:
+        return float(self._data.get("revenue", 0.0))
+
+    @property
+    def avg_latency_ms(self) -> float:
+        return float(self._data.get("avg_latency_ms", 0.0))
+
+    @property
+    def error_rate(self) -> float:
+        return float(self._data.get("error_rate", 0.0))
 
     @property
     def created_at(self) -> datetime:

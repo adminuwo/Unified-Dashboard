@@ -16,9 +16,14 @@ from src.logs.router import router as logs_router
 from src.admin.router import router as admin_router
 from src.telemetry.router import router as telemetry_router
 from src.store_analytics.router import router as store_analytics_router
+from src.unified_analytics.router import router as unified_analytics_router
 from src.store_analytics.scheduler import (
     start_store_analytics_scheduler,
     shutdown_store_analytics_scheduler
+)
+from src.unified_analytics.scheduler import (
+    start_unified_analytics_scheduler,
+    shutdown_unified_analytics_scheduler
 )
 
 
@@ -30,9 +35,17 @@ async def lifespan(app: FastAPI):
         start_store_analytics_scheduler()
     except Exception as e:
         print(f"[lifespan] Note: Store analytics scheduler initialization: {e}")
+    try:
+        start_unified_analytics_scheduler()
+    except Exception as e:
+        print(f"[lifespan] Note: Unified analytics scheduler initialization: {e}")
     yield
     try:
         shutdown_store_analytics_scheduler()
+    except Exception:
+        pass
+    try:
+        shutdown_unified_analytics_scheduler()
     except Exception:
         pass
 
@@ -90,6 +103,7 @@ app.include_router(logs_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(telemetry_router, prefix="/api")
 app.include_router(store_analytics_router, prefix="/api")
+app.include_router(unified_analytics_router, prefix="/api")
 
 
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse  # type: ignore

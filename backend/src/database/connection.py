@@ -32,6 +32,12 @@ def get_client() -> pymongo.MongoClient:
 
 
 
+def get_db_instance() -> Database:
+    """Return Database instance directly for background workers and schedulers."""
+    client = get_client()
+    return client[settings.MONGODB_DB_NAME]
+
+
 def get_db() -> Generator[Database, None, None]:
     """Dependency for obtaining MongoDB database per request."""
     client = get_client()
@@ -88,6 +94,17 @@ def init_db(db: Database | None = None):
         ], unique=True)
         db["store_analytics"].create_index("project")
         db["store_analytics"].create_index("date")
+
+        db["analytics_cache"].create_index("cache_key", unique=True)
+        db["analytics_cache"].create_index("expires_at")
+
+        db["events"].create_index([("created_at", pymongo.DESCENDING)])
+        db["events"].create_index("app_code")
+        db["events"].create_index("event_type")
+        db["events"].create_index("visitor_id")
+        db["events"].create_index("session_id")
+
+        db["metrics_daily"].create_index([("date", 1), ("app_code", 1), ("platform", 1)], unique=True)
     except Exception as e:
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
 

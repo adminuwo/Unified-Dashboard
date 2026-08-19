@@ -26,7 +26,25 @@ class Settings(BaseSettings):
     GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: str | None = None
     GOOGLE_PLAY_PROJECT_ID: str | None = None
     GOOGLE_PLAY_GCS_BUCKET_ID: str | None = None
-    PLAY_STORE_SYNC_INTERVAL_HOURS: int = 24
+    PLAY_STORE_SYNC_INTERVAL_HOURS: int = 6
+
+    # Google Analytics 4 (GA4) Configuration
+    GA4_PROPERTY_ID: str | None = None
+    GA4_CREDENTIALS_JSON: str | None = None
+
+    # Apple App Store Connect Configuration (dev.ios)
+    APP_STORE_KEY_ID: str | None = None
+    APP_STORE_ISSUER_ID: str | None = None
+    APP_STORE_PRIVATE_KEY: str | None = None
+    APP_STORE_APP_ID: str | None = None
+
+    # Google Cloud Platform (GCP) Monitoring Configuration
+    GCP_PROJECT_ID: str | None = None
+    GCP_SERVICE_ACCOUNT_JSON: str | None = None
+
+    # Firebase Mobile Analytics Configuration
+    FIREBASE_PROJECT_ID: str | None = None
+    FIREBASE_CREDENTIALS_JSON: str | None = None
 
     @property
     def cors_origins(self) -> List[str]:
