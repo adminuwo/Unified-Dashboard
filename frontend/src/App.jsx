@@ -13,18 +13,19 @@ import { ApiSandbox } from './components/ApiSandbox';
 import { ChatTrackingTab } from './components/ChatTrackingTab';
 import { AppDownloadsTab } from './components/AppDownloadsTab';
 import { StoreAnalytics } from './components/StoreAnalytics';
-
+import { UnifiedAnalytics } from './components/UnifiedAnalytics';
 import { AuthTokenTester } from './components/AuthTokenTester';
 
 export function App() {
   const { token } = useAuth();
-  const [currentTab, setTab] = useState('overview');
+  const [currentTab, setTab] = useState('unified_analytics');
 
   if (!token) {
     return <Login />;
   }
 
   const tabTitles = {
+    unified_analytics: { title: 'Unified Analytics & Intelligence (Phase 3)', subtitle: 'Centralized Multi-Platform Telemetry: GA4 Web, Google Play, App Store Connect & GCP Monitoring' },
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
@@ -51,6 +52,7 @@ export function App() {
         />
 
         <main className="main-content">
+          {currentTab === 'unified_analytics' && <UnifiedAnalytics />}
           {currentTab === 'overview' && <Overview />}
           {currentTab === 'overlap' && <OverlapAnalytics />}
           {currentTab === 'auth_tester' && <AuthTokenTester />}
