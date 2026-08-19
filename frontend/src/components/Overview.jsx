@@ -28,14 +28,16 @@ export const Overview = () => {
   const { authFetch } = useAuth();
   const [stats, setStats] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
+  const [playAnalytics, setPlayAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [statsRes, telemetryRes] = await Promise.all([
+      const [statsRes, telemetryRes, playRes] = await Promise.all([
         authFetch('/api/admin/stats'),
-        authFetch('/api/telemetry/overview')
+        authFetch('/api/telemetry/overview'),
+        authFetch('/api/admin/analytics/google-play/overview?app_codes=aisa,ailegal')
       ]);
 
       if (statsRes.ok) {
@@ -45,6 +47,10 @@ export const Overview = () => {
       if (telemetryRes.ok) {
         const tData = await telemetryRes.json();
         setTelemetry(tData);
+      }
+      if (playRes.ok) {
+        const pData = await playRes.json();
+        setPlayAnalytics(pData.data);
       }
     } catch (err) {
       console.error('Failed to fetch overview data:', err);
@@ -153,11 +159,20 @@ export const Overview = () => {
 
         <div className="metric-card">
           <div className="metric-header">
-            <span>App Downloads</span>
-            <div className="metric-icon">📥</div>
+            <span>Google Play Installs</span>
+            <div className="metric-icon">🤖</div>
           </div>
-          <div className="metric-value">{telemetry?.total_downloads || 0}</div>
-          <div className="metric-sub">Across all platforms</div>
+          <div className="metric-value">{playAnalytics?.combined?.daily_device_installs || telemetry?.total_downloads || 0}</div>
+          <div className="metric-sub">Android Devices (Google Play)</div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-header">
+            <span>App Store Downloads</span>
+            <div className="metric-icon">🍏</div>
+          </div>
+          <div className="metric-value">{playAnalytics?.combined?.ios_total_downloads || 0}</div>
+          <div className="metric-sub">iOS Devices (App Store Connect)</div>
         </div>
 
         <div className="metric-card">

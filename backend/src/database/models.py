@@ -537,21 +537,6 @@ class AppDownloadEntry(MongoModel):
         return self._data.get("created_at") or utc_now()
 
 
-PROJECT_MAPPINGS: Dict[str, Dict[str, str]] = {
-    "AISA": {
-        "project": "AISA",
-        "platform": "android",
-        "package_name": "com.uwo.aisa",
-        "label": "AISA Android App"
-    },
-    "AI_LEGAL": {
-        "project": "AI_LEGAL",
-        "platform": "android",
-        "package_name": "com.uwo.ailegal",
-        "label": "AI Legal Android App"
-    }
-}
-
 
 class StoreAnalytics(MongoModel):
     @classmethod

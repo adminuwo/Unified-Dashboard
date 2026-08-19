@@ -12,7 +12,6 @@ import { CentralLogs } from './components/CentralLogs';
 import { ApiSandbox } from './components/ApiSandbox';
 import { ChatTrackingTab } from './components/ChatTrackingTab';
 import { AppDownloadsTab } from './components/AppDownloadsTab';
-import { StoreAnalytics } from './components/StoreAnalytics';
 import { UnifiedAnalytics } from './components/UnifiedAnalytics';
 import { AuthTokenTester } from './components/AuthTokenTester';
 
@@ -29,7 +28,6 @@ export function App() {
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
-    store_analytics: { title: 'App Store Analytics', subtitle: 'Google Play reporting & install metrics for AISA and AI Legal' },
     applications: { title: 'Application API Keys', subtitle: 'Manage API credentials for connected standalone applications' },
     chat_tracking: { title: 'AI Chat Prompt Tracking', subtitle: 'Real-time AI model token consumption and session metrics' },
     app_downloads: { title: 'App Downloads & Installs', subtitle: 'Platform distribution across Android, iOS, Windows and Web PWA' },
@@ -56,7 +54,6 @@ export function App() {
           {currentTab === 'overview' && <Overview />}
           {currentTab === 'overlap' && <OverlapAnalytics />}
           {currentTab === 'auth_tester' && <AuthTokenTester />}
-          {currentTab === 'store_analytics' && <StoreAnalytics />}
           {currentTab === 'applications' && <ApplicationKeys />}
           {currentTab === 'chat_tracking' && <ChatTrackingTab />}
           {currentTab === 'app_downloads' && <AppDownloadsTab />}

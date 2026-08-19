@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 from pymongo.database import Database  # type: ignore
 
@@ -74,7 +74,7 @@ class AuthRepository:
             "refresh_token_hash": refresh_token_hash,
             "device": device,
             "ip_address": ip_address,
-            "expires_at": expires_at or (now + datetime.timedelta(days=7)),
+            "expires_at": expires_at or (now + timedelta(days=7)),
             "created_at": now,
         }
         self.sessions_col.insert_one(session_doc)

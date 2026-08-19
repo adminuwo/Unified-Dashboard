@@ -44,7 +44,7 @@ def get_platform_stats(db: Database) -> PlatformStatsResponse:
     active_apps = db["application_keys"].count_documents({"status": "active"})
 
     # Total revenue from succeeded payments via MongoDB aggregation pipeline
-    pipeline = [
+    pipeline: List[Dict[str, Any]] = [
         {"$match": {"status": "succeeded"}},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
     ]

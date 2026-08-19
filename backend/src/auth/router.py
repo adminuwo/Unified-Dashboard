@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status  # type: ignore
+from fastapi import APIRouter, Depends, status, HTTPException  # type: ignore
 from pymongo.database import Database  # type: ignore
 
 from src.database.connection import get_db
@@ -35,7 +35,7 @@ def login(
     return TokenResponse(
         access_token=tokens["access_token"],
         refresh_token=tokens["refresh_token"],
-        user=user
+        user=UserResponse.model_validate(user)
     )
 
 
@@ -49,11 +49,13 @@ def refresh_token(
     tokens = service.refresh_access_token(db, refresh_in.refresh_token)
     payload = service.jwt.decode(tokens["access_token"], service.settings.JWT_SECRET, algorithms=[service.settings.JWT_ALGORITHM])
     user_doc = db["users"].find_one({"_id": payload["sub"]})
-    user = User(user_doc) if user_doc else None
+    if not user_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = User(user_doc)
     return TokenResponse(
         access_token=tokens["access_token"],
         refresh_token=tokens["refresh_token"],
-        user=user
+        user=UserResponse.model_validate(user)
     )
 
 
