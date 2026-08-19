@@ -36,6 +36,16 @@ def client(db_session):
 @pytest.fixture(scope="function")
 def admin_headers(client, db_session):
     """Fixture providing valid admin JWT authorization header."""
+    if not db_session["admin_users"].find_one({"username": "super.admin@unified.com"}):
+        from src.modules.auth.service import hash_password
+        db_session["admin_users"].insert_one({
+            "_id": "super_admin_test_id",
+            "username": "super.admin@unified.com",
+            "password_hash": hash_password("@xQn!W&Wg-ufSWn)93Qg_0S2"),
+            "role": "super_admin",
+            "name": "Super Admin",
+            "is_active": True
+        })
     res = client.post("/api/admin/login", json={
         "username": "super.admin@unified.com",
         "password": "@xQn!W&Wg-ufSWn)93Qg_0S2"
