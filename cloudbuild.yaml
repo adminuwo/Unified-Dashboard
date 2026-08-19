@@ -38,7 +38,7 @@ images:
   - '${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
 
 substitutions:
-  _LOCATION: 'us-central1'
+  _LOCATION: 'asia-south1'
   _REPOSITORY: 'unified-dashboard-repo'
   _SERVICE_NAME: 'unified-dashboard'
 
