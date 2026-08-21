@@ -70,7 +70,16 @@ def get_tracker_script():
   'use strict';
   var script = document.currentScript || document.querySelector('script[data-site]');
   var site = (script && script.getAttribute('data-site')) || 'general';
-  var endpoint = (script && script.getAttribute('data-endpoint')) || window.location.origin + '/api/web-stats/collect';
+  var scriptOrigin = (function(){
+    try {
+      if (script && script.src) {
+        var u = new URL(script.src, window.location.href);
+        return u.origin;
+      }
+    } catch(e){}
+    return 'https://admin.uwo24.com';
+  })();
+  var endpoint = (script && script.getAttribute('data-endpoint')) || (scriptOrigin + '/api/web-stats/collect');
   var visitorId = localStorage.getItem('_unf_vis') || (function(){
     var id = 'v_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
     localStorage.setItem('_unf_vis', id);

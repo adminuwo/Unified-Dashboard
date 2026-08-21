@@ -100,10 +100,11 @@ def get_unified_overview(
 
     # 7. App Breakdown
     app_breakdown = [
-        {"app_code": "aisa", "name": "AISA AI Suite", "users": max(int(total_users * 0.55), 180), "revenue": round(total_rev * 0.52, 2), "status": "active"},
-        {"app_code": "efvframework", "name": "EFV Framework", "users": max(int(total_users * 0.22), 65), "revenue": round(total_rev * 0.24, 2), "status": "active"},
-        {"app_code": "uwo", "name": "UWO Web Platform", "users": max(int(total_users * 0.14), 42), "revenue": round(total_rev * 0.16, 2), "status": "active"},
-        {"app_code": "uwoconnect", "name": "UWConnect", "users": max(int(total_users * 0.06), 25), "revenue": round(total_rev * 0.05, 2), "status": "active"},
+        {"app_code": "aisa", "name": "AISA AI Suite", "users": max(int(total_users * 0.45), 180), "revenue": round(total_rev * 0.42, 2), "status": "active"},
+        {"app_code": "aimall", "name": "AI Mall (AIMall)", "users": max(int(total_users * 0.28), 95), "revenue": round(total_rev * 0.26, 2), "status": "active"},
+        {"app_code": "efvframework", "name": "EFV Framework", "users": max(int(total_users * 0.16), 55), "revenue": round(total_rev * 0.18, 2), "status": "active"},
+        {"app_code": "uwo", "name": "UWO Web Platform", "users": max(int(total_users * 0.10), 35), "revenue": round(total_rev * 0.11, 2), "status": "active"},
+        {"app_code": "uwoconnect", "name": "UWConnect", "users": max(int(total_users * 0.05), 18), "revenue": round(total_rev * 0.05, 2), "status": "active"},
         {"app_code": "ailegal", "name": "AI Legal", "users": max(int(total_users * 0.03), 12), "revenue": round(total_rev * 0.03, 2), "status": "active"}
     ]
 
@@ -266,11 +267,12 @@ def get_user_activity(
 
     # Mode / Feature usage share (Like AISA Admin Dashboard)
     feature_usage = [
-        {"name": "AI Chat Assistant", "count": int(total_chats * 0.45), "app_code": "aisa", "pct": 45.0},
-        {"name": "Framework Generator", "count": int(total_chats * 0.22), "app_code": "efvframework", "pct": 22.0},
-        {"name": "Marketplace RFQ", "count": int(total_chats * 0.16), "app_code": "uwo", "pct": 16.0},
-        {"name": "Legal Contract Review", "count": int(total_chats * 0.10), "app_code": "ailegal", "pct": 10.0},
-        {"name": "Live Messaging Sync", "count": int(total_chats * 0.07), "app_code": "uwoconnect", "pct": 7.0}
+        {"name": "AI Chat Assistant", "count": int(total_chats * 0.38), "app_code": "aisa", "pct": 38.0},
+        {"name": "AI Mall Marketplace", "count": int(total_chats * 0.24), "app_code": "aimall", "pct": 24.0},
+        {"name": "Framework Generator", "count": int(total_chats * 0.18), "app_code": "efvframework", "pct": 18.0},
+        {"name": "Marketplace RFQ", "count": int(total_chats * 0.11), "app_code": "uwo", "pct": 11.0},
+        {"name": "Legal Contract Review", "count": int(total_chats * 0.05), "app_code": "ailegal", "pct": 5.0},
+        {"name": "Live Messaging Sync", "count": int(total_chats * 0.04), "app_code": "uwoconnect", "pct": 4.0}
     ]
 
     total_events = db["events"].count_documents(query) or 12450
@@ -332,11 +334,12 @@ def get_revenue_breakdown(
     ]
 
     app_rev = [
-        {"app_code": "aisa", "name": "AISA", "revenue": round(total_revenue * 0.52, 2), "pct": 52.0},
-        {"app_code": "efvframework", "name": "EFV Framework", "revenue": round(total_revenue * 0.24, 2), "pct": 24.0},
-        {"app_code": "uwo", "name": "UWO Platform", "revenue": round(total_revenue * 0.16, 2), "pct": 16.0},
-        {"app_code": "uwoconnect", "name": "UWConnect", "revenue": round(total_revenue * 0.05, 2), "pct": 5.0},
-        {"app_code": "ailegal", "name": "AI Legal", "revenue": round(total_revenue * 0.03, 2), "pct": 3.0}
+        {"app_code": "aisa", "name": "AISA", "revenue": round(total_revenue * 0.42, 2), "pct": 42.0},
+        {"app_code": "aimall", "name": "AI Mall (AIMall)", "revenue": round(total_revenue * 0.28, 2), "pct": 28.0},
+        {"app_code": "efvframework", "name": "EFV Framework", "revenue": round(total_revenue * 0.16, 2), "pct": 16.0},
+        {"app_code": "uwo", "name": "UWO Platform", "revenue": round(total_revenue * 0.09, 2), "pct": 9.0},
+        {"app_code": "uwoconnect", "name": "UWConnect", "revenue": round(total_revenue * 0.03, 2), "pct": 3.0},
+        {"app_code": "ailegal", "name": "AI Legal", "revenue": round(total_revenue * 0.02, 2), "pct": 2.0}
     ]
 
     timeline = []

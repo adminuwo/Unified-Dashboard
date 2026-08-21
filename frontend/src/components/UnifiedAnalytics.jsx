@@ -103,7 +103,8 @@ export const UnifiedAnalytics = () => {
   };
 
   const copySnippet = (appName, siteId) => {
-    const code = `<script defer src="${window.location.origin}/api/web-stats/tracker.js" data-site="${siteId}"></script>`;
+    const baseUrl = window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com';
+    const code = `<script defer src="${baseUrl}/api/web-stats/tracker.js" data-site="${siteId}" data-endpoint="${baseUrl}/api/web-stats/collect"></script>`;
     navigator.clipboard.writeText(code);
     setCopiedApp(appName);
     setTimeout(() => setCopiedApp(null), 2500);
@@ -305,6 +306,7 @@ export const UnifiedAnalytics = () => {
           >
             <option value="all">🌐 All Applications (Unified)</option>
             <option value="aisa">⚡ AISA AI Suite (aisa)</option>
+            <option value="aimall">🛒 AI Mall (aimall)</option>
             <option value="efvframework">🚀 EFV Framework (efvframework)</option>
             <option value="uwo">📦 UWO Web Platform (uwo)</option>
             <option value="uwoconnect">🔗 UWConnect (uwoconnect)</option>
@@ -945,6 +947,7 @@ export const UnifiedAnalytics = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {[
                 { name: 'AISA Web App', site: 'aisa' },
+                { name: 'AI Mall Web App', site: 'aimall' },
                 { name: 'EFV Web App', site: 'efvframework' },
                 { name: 'UWO Web App', site: 'uwo' },
                 { name: 'UWConnect', site: 'uwoconnect' },
@@ -960,7 +963,7 @@ export const UnifiedAnalytics = () => {
                     </button>
                   </div>
                   <pre style={{ margin: 0, fontSize: '11px', color: '#94a3b8', overflowX: 'auto', background: 'transparent' }}>
-                    {`<script defer src="${window.location.origin}/api/web-stats/tracker.js" data-site="${item.site}"></script>`}
+                    {`<script defer src="${window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com'}/api/web-stats/tracker.js" data-site="${item.site}" data-endpoint="${window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com'}/api/web-stats/collect"></script>`}
                   </pre>
                 </div>
               ))}

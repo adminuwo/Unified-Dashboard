@@ -259,10 +259,11 @@ def get_normalized_web_analytics(
 
     # App-wise breakdown
     app_breakdown = [
-        {"app_code": "aisa", "label": "AISA Web App", "pageviews": int(total_pageviews * 0.42), "visitors": int(unique_visitors * 0.40)},
-        {"app_code": "efvframework", "label": "EFV Framework", "pageviews": int(total_pageviews * 0.26), "visitors": int(unique_visitors * 0.28)},
-        {"app_code": "uwo", "label": "UWO Web Platform", "pageviews": int(total_pageviews * 0.18), "visitors": int(unique_visitors * 0.19)},
-        {"app_code": "uwoconnect", "label": "UWConnect", "pageviews": int(total_pageviews * 0.10), "visitors": int(unique_visitors * 0.09)},
+        {"app_code": "aisa", "label": "AISA Web App", "pageviews": int(total_pageviews * 0.35), "visitors": int(unique_visitors * 0.34)},
+        {"app_code": "aimall", "label": "AI Mall (AIMall)", "pageviews": int(total_pageviews * 0.24), "visitors": int(unique_visitors * 0.23)},
+        {"app_code": "efvframework", "label": "EFV Framework", "pageviews": int(total_pageviews * 0.18), "visitors": int(unique_visitors * 0.20)},
+        {"app_code": "uwo", "label": "UWO Web Platform", "pageviews": int(total_pageviews * 0.12), "visitors": int(unique_visitors * 0.12)},
+        {"app_code": "uwoconnect", "label": "UWConnect", "pageviews": int(total_pageviews * 0.07), "visitors": int(unique_visitors * 0.07)},
         {"app_code": "ailegal", "label": "AI Legal", "pageviews": int(total_pageviews * 0.04), "visitors": int(unique_visitors * 0.04)}
     ]
 
