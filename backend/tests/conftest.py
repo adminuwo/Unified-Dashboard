@@ -33,6 +33,9 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
+from src.auth.service import hash_password
+
+
 @pytest.fixture(scope="function")
 def admin_headers(client, db_session):
     """Fixture providing valid admin JWT authorization header."""

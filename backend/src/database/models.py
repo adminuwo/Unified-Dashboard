@@ -99,7 +99,8 @@ class User(MongoModel):
         return self._data.get("subscriptions", [])
 
 
-VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "uwo", "aimall", "general"}
+VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "uwo", "aimall", "general", "other"}
+
 
 
 class ApplicationKey(MongoModel):
@@ -819,3 +820,224 @@ class DailyMetric(MongoModel):
     @property
     def updated_at(self) -> datetime:
         return self._data.get("updated_at") or utc_now()
+
+
+class RevenueTransaction(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        source: str,
+        provider: str,
+        product_code: str,
+        platform: str,
+        external_transaction_id: str,
+        external_order_id: Optional[str] = None,
+        transaction_type: str = "payment",
+        gross_amount: float = 0.0,
+        tax_amount: float = 0.0,
+        fee_amount: float = 0.0,
+        refund_amount: float = 0.0,
+        net_amount: float = 0.0,
+        currency: str = "INR",
+        reporting_amount: Optional[float] = None,
+        reporting_currency: str = "INR",
+        exchange_rate: float = 1.0,
+        transaction_date: Optional[datetime] = None,
+        country: str = "IN",
+        status: str = "completed",
+        is_test: bool = False,
+        customer_id: Optional[str] = None,
+        customer_email: Optional[str] = None,
+        subscription_id: Optional[str] = None,
+        plan_id: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        tx_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        dt = transaction_date or now
+        rep_amt = reporting_amount if reporting_amount is not None else (gross_amount * exchange_rate)
+        return {
+            "_id": tx_id or generate_uuid(),
+            "source": source.lower(),
+            "provider": provider.lower(),
+            "product_code": product_code.lower(),
+            "platform": platform.lower(),
+            "external_transaction_id": external_transaction_id,
+            "external_order_id": external_order_id,
+            "transaction_type": transaction_type.lower(),
+            "gross_amount": float(gross_amount),
+            "tax_amount": float(tax_amount),
+            "fee_amount": float(fee_amount),
+            "refund_amount": float(refund_amount),
+            "net_amount": float(net_amount),
+            "currency": currency.upper(),
+            "reporting_amount": float(rep_amt),
+            "reporting_currency": reporting_currency.upper(),
+            "exchange_rate": float(exchange_rate),
+            "transaction_date": dt,
+            "country": country.upper(),
+            "status": status.lower(),
+            "is_test": is_test,
+            "customer_id": customer_id,
+            "customer_email": customer_email,
+            "subscription_id": subscription_id,
+            "plan_id": plan_id,
+            "raw_reference": raw_reference,
+            "metadata": metadata or {},
+            "created_at": now,
+            "updated_at": now,
+        }
+
+
+class RevenueRawEvent(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        provider: str,
+        product_code: str,
+        external_id: str,
+        event_type: str,
+        payload: Dict[str, Any],
+        file_hash: Optional[str] = None,
+        processed: bool = True,
+        event_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": event_id or generate_uuid(),
+            "provider": provider.lower(),
+            "product_code": product_code.lower(),
+            "external_id": external_id,
+            "event_type": event_type.lower(),
+            "payload": payload,
+            "file_hash": file_hash,
+            "received_at": now,
+            "processed": processed,
+            "created_at": now,
+        }
+
+
+class RevenueSyncJob(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        provider: str,
+        product_code: str,
+        sync_type: str = "realtime",
+        started_at: Optional[datetime] = None,
+        completed_at: Optional[datetime] = None,
+        status: str = "running",
+        records_processed: int = 0,
+        records_created: int = 0,
+        records_updated: int = 0,
+        error_count: int = 0,
+        error_message: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": job_id or generate_uuid(),
+            "provider": provider.lower(),
+            "product_code": product_code.lower(),
+            "sync_type": sync_type.lower(),
+            "started_at": started_at or now,
+            "completed_at": completed_at,
+            "status": status.lower(),
+            "records_processed": records_processed,
+            "records_created": records_created,
+            "records_updated": records_updated,
+            "error_count": error_count,
+            "error_message": error_message,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+
+class ProductRegistryEntry(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        product_code: str,
+        name: str,
+        status: str = "active",
+        platforms: Optional[List[str]] = None,
+        google_play: Optional[Dict[str, Any]] = None,
+        app_store: Optional[Dict[str, Any]] = None,
+        razorpay: Optional[Dict[str, Any]] = None,
+        stripe: Optional[Dict[str, Any]] = None,
+        entry_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": entry_id or product_code.lower(),
+            "product_code": product_code.lower(),
+            "name": name,
+            "status": status.lower(),
+            "platforms": platforms or ["web"],
+            "google_play": google_play or {"enabled": False},
+            "app_store": app_store or {"enabled": False},
+            "razorpay": razorpay or {"enabled": True},
+            "stripe": stripe or {"enabled": False},
+            "created_at": now,
+            "updated_at": now,
+        }
+
+
+class RevenueReconciliation(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        provider: str,
+        product_code: str,
+        period: str,
+        provider_reported_amount: float,
+        database_amount: float,
+        difference: float,
+        status: str = "RECONCILED",
+        currency: str = "INR",
+        notes: Optional[str] = None,
+        recon_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": recon_id or generate_uuid(),
+            "provider": provider.lower(),
+            "product_code": product_code.lower(),
+            "period": period,
+            "provider_reported_amount": float(provider_reported_amount),
+            "database_amount": float(database_amount),
+            "difference": float(difference),
+            "status": status,
+            "currency": currency.upper(),
+            "notes": notes,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+
+class RevenueAuditLog(MongoModel):
+    @classmethod
+    def create_dict(
+        cls,
+        admin_user: str,
+        action: str,
+        provider: Optional[str] = None,
+        product_code: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        result: str = "success",
+        details: Optional[Dict[str, Any]] = None,
+        log_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = utc_now()
+        return {
+            "_id": log_id or generate_uuid(),
+            "admin_user": admin_user,
+            "action": action,
+            "provider": provider,
+            "product_code": product_code,
+            "ip_address": ip_address,
+            "result": result,
+            "details": details or {},
+            "created_at": now,
+        }

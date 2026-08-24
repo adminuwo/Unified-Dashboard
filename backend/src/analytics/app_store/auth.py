@@ -1,15 +1,25 @@
+import os
 import time
-import jwt
+try:
+    import jwt  # PyJWT
+except ImportError:
+    from jose import jwt  # python-jose
+
 
 class AppStoreConnectAuth:
     def __init__(self, issuer_id: str, key_id: str, private_key: str):
-        self.issuer_id = issuer_id.strip()
-        self.key_id = key_id.strip()
-        self.private_key = private_key.strip()
+        self.issuer_id = issuer_id.strip() if issuer_id else ""
+        self.key_id = key_id.strip() if key_id else ""
+        pk = private_key.strip() if private_key else ""
+        if os.path.exists(pk):
+            with open(pk, "r", encoding="utf-8") as f:
+                self.private_key = f.read().strip()
+        else:
+            self.private_key = pk
         
     def generate_token(self, expiration_minutes: int = 10) -> str:
         """
-        Generate an ES256 signed JWT for the App Store Connect API using PyJWT.
+        Generate an ES256 signed JWT for the App Store Connect API.
         """
         now = int(time.time())
         exp = now + (expiration_minutes * 60)
@@ -28,10 +38,11 @@ class AppStoreConnectAuth:
         }
         
         token = jwt.encode(
-            payload=payload,
-            key=self.private_key,
+            payload,
+            self.private_key,
             algorithm="ES256",
             headers=headers
         )
         
         return token if isinstance(token, str) else token.decode("utf-8")
+
