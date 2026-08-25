@@ -17,7 +17,7 @@ import { AuthTokenTester } from './components/AuthTokenTester';
 
 export function App() {
   const { token } = useAuth();
-  const [currentTab, setTab] = useState('overview');
+  const [currentTab, setTab] = useState('unified_analytics');
 
   if (!token) {
     return <Login />;

@@ -5,7 +5,7 @@ export const Sidebar = ({ currentTab, setTab }) => {
   const { adminUsername, logout } = useAuth();
 
   const navItems = [
-    // { id: 'unified_analytics', label: 'Unified Analytics', icon: '🌐' },
+    { id: 'unified_analytics', label: 'Unified Analytics', icon: '🌐' },
     { id: 'overview', label: 'Overview', icon: '📊' },
     // { id: 'overlap', label: 'App Analytics', icon: '📈' },
     // { id: 'auth_tester', label: 'Auth Service', icon: '🔒' },
