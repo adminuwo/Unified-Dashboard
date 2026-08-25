@@ -112,12 +112,18 @@ def get_normalized_web_analytics(
     device_counts: Dict[str, int] = {"desktop": 0, "mobile": 0, "tablet": 0}
     browser_counts: Dict[str, int] = {"Chrome": 0, "Safari": 0, "Firefox": 0, "Edge": 0, "Other": 0}
     country_counts: Dict[str, int] = {}
-    daily_buckets: Dict[str, Dict[str, int]] = {}
+    daily_buckets: Dict[str, Dict[str, Any]] = {}
+    is_hourly = (days == 1)
 
-    # Initialize daily buckets
-    for i in range(days):
-        d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
-        daily_buckets[d_str] = {"pageviews": 0, "visitors": set()}
+    # Initialize buckets (hourly for Today / 24h, daily for 7d/30d/90d)
+    if is_hourly:
+        for h in range(24):
+            h_str = f"{h:02d}:00"
+            daily_buckets[h_str] = {"pageviews": 0, "visitors": set()}
+    else:
+        for i in range(days):
+            d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
+            daily_buckets[d_str] = {"pageviews": 0, "visitors": set()}
 
     app_pv_map: Dict[str, int] = {}
     app_vis_map: Dict[str, set] = {}
@@ -136,10 +142,10 @@ def get_normalized_web_analytics(
             app_vis_map[ac].add(vis_id)
 
             created_at = ev.get("created_at") or now
-            date_str = created_at.strftime("%Y-%m-%d")
-            if date_str in daily_buckets:
-                daily_buckets[date_str]["pageviews"] += 1
-                daily_buckets[date_str]["visitors"].add(vis_id)
+            bucket_key = created_at.strftime("%H:00") if is_hourly else created_at.strftime("%Y-%m-%d")
+            if bucket_key in daily_buckets:
+                daily_buckets[bucket_key]["pageviews"] += 1
+                daily_buckets[bucket_key]["visitors"].add(vis_id)
 
             path = ev.get("path") or "/"
             if path not in page_counts:

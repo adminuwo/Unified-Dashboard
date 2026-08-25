@@ -170,15 +170,26 @@ def get_unified_overview(
         p_date = p_dt.strftime("%Y-%m-%d")
         rev_daily_map[p_date] = rev_daily_map.get(p_date, 0.0) + float(p.get("amount", 0.0))
 
+    is_hourly = (days == 1)
     timeline = []
-    for i in range(days):
-        d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
-        timeline.append({
-            "date": d_str,
-            "web_views": web_daily_map.get(d_str, 0),
-            "mobile_installs": play_daily_map.get(d_str, 0) + appstore_daily_map.get(d_str, 0),
-            "revenue": round(rev_daily_map.get(d_str, 0.0), 2)
-        })
+    if is_hourly:
+        for h in range(24):
+            h_str = f"{h:02d}:00"
+            timeline.append({
+                "date": h_str,
+                "web_views": web_daily_map.get(h_str, 0),
+                "mobile_installs": 0,
+                "revenue": 0.0
+            })
+    else:
+        for i in range(days):
+            d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
+            timeline.append({
+                "date": d_str,
+                "web_views": web_daily_map.get(d_str, 0),
+                "mobile_installs": play_daily_map.get(d_str, 0) + appstore_daily_map.get(d_str, 0),
+                "revenue": round(rev_daily_map.get(d_str, 0.0), 2)
+            })
 
     result = {
         "total_users": total_users,
