@@ -117,12 +117,12 @@ export const UnifiedAnalytics = () => {
     labels: overviewTimelineLabels,
     datasets: [
       {
-        label: 'Web Pageviews (GA4)',
+        label: 'Web Pageviews (GA4 & Auto-Tracker)',
         data: overviewData?.timeline?.map((t) => t.web_views) || [],
         borderColor: '#6366f1',
         backgroundColor: 'rgba(99, 102, 241, 0.15)',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       },
       {
         label: 'Mobile Installs (Play & App Store)',
@@ -130,7 +130,7 @@ export const UnifiedAnalytics = () => {
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.15)',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       }
     ]
   };
@@ -145,7 +145,7 @@ export const UnifiedAnalytics = () => {
         borderColor: '#8b5cf6',
         backgroundColor: 'rgba(139, 92, 246, 0.15)',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       },
       {
         label: 'Unique Active Visitors',
@@ -153,7 +153,7 @@ export const UnifiedAnalytics = () => {
         borderColor: '#38bdf8',
         backgroundColor: 'transparent',
         borderDash: [5, 5],
-        tension: 0.4
+        tension: 0.2
       }
     ]
   };
@@ -168,7 +168,7 @@ export const UnifiedAnalytics = () => {
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.2)',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       },
       {
         label: 'Apple App Store Units (iOS)',
@@ -176,7 +176,7 @@ export const UnifiedAnalytics = () => {
         borderColor: '#38bdf8',
         backgroundColor: 'rgba(56, 189, 248, 0.2)',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       }
     ]
   };
@@ -192,14 +192,14 @@ export const UnifiedAnalytics = () => {
         backgroundColor: 'rgba(99, 102, 241, 0.15)',
         yAxisID: 'y',
         fill: true,
-        tension: 0.4
+        tension: 0.2
       },
       {
         label: 'Avg Latency (ms)',
         data: gcpData?.timeline?.map((t) => t.avg_latency_ms) || [],
         borderColor: '#f59e0b',
         yAxisID: 'y1',
-        tension: 0.4
+        tension: 0.2
       }
     ]
   };
@@ -212,7 +212,7 @@ export const UnifiedAnalytics = () => {
     },
     scales: {
       x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-      y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      y: { beginAtZero: true, ticks: { color: '#64748b', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } }
     }
   };
 
@@ -224,8 +224,8 @@ export const UnifiedAnalytics = () => {
     },
     scales: {
       x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-      y: { type: 'linear', position: 'left', ticks: { color: '#6366f1' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-      y1: { type: 'linear', position: 'right', ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false } }
+      y: { type: 'linear', position: 'left', beginAtZero: true, ticks: { color: '#6366f1', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y1: { type: 'linear', position: 'right', beginAtZero: true, ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false } }
     }
   };
 

@@ -99,7 +99,7 @@ class User(MongoModel):
         return self._data.get("subscriptions", [])
 
 
-VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "uwo", "aimall", "general", "other"}
+VALID_APP_CODES = {"ailegal", "aisa", "aiads", "uwoconnect", "efvframework", "uwo", "aimall", "yugamc", "general", "other"}
 
 
 

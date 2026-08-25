@@ -119,12 +119,21 @@ def get_normalized_web_analytics(
         d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
         daily_buckets[d_str] = {"pageviews": 0, "visitors": set()}
 
+    app_pv_map: Dict[str, int] = {}
+    app_vis_map: Dict[str, set] = {}
+
     for ev in events_list:
         event_type = ev.get("event_type", "pageview")
         if event_type in ("pageview", "visit"):
             total_pageviews += 1
             vis_id = ev.get("visitor_id") or ev.get("user_id") or "anon"
             unique_visitors_set.add(vis_id)
+
+            ac = (ev.get("app_code") or "general").lower()
+            app_pv_map[ac] = app_pv_map.get(ac, 0) + 1
+            if ac not in app_vis_map:
+                app_vis_map[ac] = set()
+            app_vis_map[ac].add(vis_id)
 
             created_at = ev.get("created_at") or now
             date_str = created_at.strftime("%Y-%m-%d")
@@ -162,8 +171,12 @@ def get_normalized_web_analytics(
                 src = "Twitter / X"
             elif "linkedin" in src.lower():
                 src = "LinkedIn"
+            elif "facebook" in src.lower() or "meta" in src.lower():
+                src = "Meta / Facebook"
+            elif src == "Direct" or not src:
+                src = "Direct / Bookmarks"
             else:
-                src = "Direct / Referral"
+                src = "Referral"
             source_counts[src] = source_counts.get(src, 0) + 1
 
             # Country
@@ -177,95 +190,61 @@ def get_normalized_web_analytics(
                 if dur < 10.0:
                     bounces_count += 1
 
-    # In case there are low raw events, generate realistic normalized platform stats
-    if total_pageviews == 0:
-        app_multiplier = 1.0 if not app_code or app_code.lower() == "all" else 0.45
-        total_pageviews = int(12450 * (days / 30) * app_multiplier)
-        unique_visitors = int(4820 * (days / 30) * app_multiplier)
-        avg_session_dur = 142.5
-        bounce_rate = 28.4
-        device_counts = {
-            "desktop": int(total_pageviews * 0.58),
-            "mobile": int(total_pageviews * 0.38),
-            "tablet": int(total_pageviews * 0.04)
-        }
-        browser_counts = {
-            "Chrome": int(total_pageviews * 0.64),
-            "Safari": int(total_pageviews * 0.22),
-            "Firefox": int(total_pageviews * 0.08),
-            "Edge": int(total_pageviews * 0.04),
-            "Other": int(total_pageviews * 0.02)
-        }
-        top_pages = [
-            {"path": "/chat", "views": int(total_pageviews * 0.38), "unique_visitors": int(unique_visitors * 0.42), "bounce_rate": 22.1},
-            {"path": "/dashboard", "views": int(total_pageviews * 0.24), "unique_visitors": int(unique_visitors * 0.31), "bounce_rate": 18.5},
-            {"path": "/pricing", "views": int(total_pageviews * 0.16), "unique_visitors": int(unique_visitors * 0.22), "bounce_rate": 34.0},
-            {"path": "/editor", "views": int(total_pageviews * 0.12), "unique_visitors": int(unique_visitors * 0.15), "bounce_rate": 25.4},
-            {"path": "/docs", "views": int(total_pageviews * 0.10), "unique_visitors": int(unique_visitors * 0.12), "bounce_rate": 31.2}
-        ]
-        traffic_sources = [
-            {"source": "Direct / Bookmarks", "users": int(unique_visitors * 0.45), "pct": 45.0},
-            {"source": "Google Search (Organic)", "users": int(unique_visitors * 0.32), "pct": 32.0},
-            {"source": "LinkedIn & Social", "users": int(unique_visitors * 0.14), "pct": 14.0},
-            {"source": "GitHub Referral", "users": int(unique_visitors * 0.09), "pct": 9.0}
-        ]
-        country_split = [
-            {"country": "India (IN)", "code": "IN", "users": int(unique_visitors * 0.72)},
-            {"country": "United States (US)", "code": "US", "users": int(unique_visitors * 0.15)},
-            {"country": "United Kingdom (GB)", "code": "GB", "users": int(unique_visitors * 0.06)},
-            {"country": "Canada (CA)", "code": "CA", "users": int(unique_visitors * 0.04)},
-            {"country": "Germany (DE)", "code": "DE", "users": int(unique_visitors * 0.03)}
-        ]
-        timeline = []
-        for i in range(days):
-            d_str = (cutoff + timedelta(days=i + 1)).strftime("%Y-%m-%d")
-            factor = 0.8 + 0.4 * ((i * 7) % 10) / 10.0
-            pv = int((total_pageviews / days) * factor)
-            uv = int((unique_visitors / days) * factor)
-            timeline.append({"date": d_str, "pageviews": pv, "active_users": uv})
-    else:
-        unique_visitors = len(unique_visitors_set)
-        avg_session_dur = round(total_duration / duration_count, 1) if duration_count > 0 else 120.0
-        bounce_rate = round((bounces_count / total_pageviews * 100), 1) if total_pageviews > 0 else 25.0
-        top_pages = []
-        for p, data in sorted(page_counts.items(), key=lambda x: x[1]["views"], reverse=True)[:10]:
-            top_pages.append({
-                "path": p,
-                "views": data["views"],
-                "unique_visitors": len(data["visitors"]),
-                "bounce_rate": round(25.0, 1)
-            })
-        total_src = sum(source_counts.values()) or 1
-        traffic_sources = [
-            {"source": s, "users": c, "pct": round(c / total_src * 100, 1)}
-            for s, c in sorted(source_counts.items(), key=lambda x: x[1], reverse=True)
-        ]
-        country_split = [
-            {"country": c, "code": c, "users": cnt}
-            for c, cnt in sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:8]
-        ]
-        timeline = []
-        for d_str, b in daily_buckets.items():
-            timeline.append({
-                "date": d_str,
-                "pageviews": b["pageviews"],
-                "active_users": len(b["visitors"])
-            })
+    unique_visitors = len(unique_visitors_set)
+    avg_session_dur = round(total_duration / duration_count, 1) if duration_count > 0 else 0.0
+    bounce_rate = round((bounces_count / total_pageviews * 100), 1) if total_pageviews > 0 else 0.0
+
+    top_pages = []
+    for p, data in sorted(page_counts.items(), key=lambda x: x[1]["views"], reverse=True)[:10]:
+        top_pages.append({
+            "path": p,
+            "views": data["views"],
+            "unique_visitors": len(data["visitors"]),
+            "bounce_rate": round((bounces_count / total_pageviews * 100), 1) if total_pageviews > 0 else 0.0
+        })
+
+    total_src = sum(source_counts.values()) or 1
+    traffic_sources = [
+        {"source": s, "users": c, "pct": round(c / total_src * 100, 1)}
+        for s, c in sorted(source_counts.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    country_split = [
+        {"country": c, "code": c, "users": cnt}
+        for c, cnt in sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+    ]
+
+    timeline = []
+    for d_str, b in daily_buckets.items():
+        timeline.append({
+            "date": d_str,
+            "pageviews": b["pageviews"],
+            "active_users": len(b["visitors"])
+        })
 
     # Real-time active users (last 5 minutes)
     realtime_cutoff = now - timedelta(minutes=5)
-    realtime_count = db["events"].count_documents({"created_at": {"$gte": realtime_cutoff}})
-    active_realtime_users = max(realtime_count, 14 if not app_code or app_code.lower() == "all" else 6)
+    realtime_count = len(db["events"].distinct("visitor_id", {"created_at": {"$gte": realtime_cutoff}}))
+    active_realtime_users = realtime_count
 
-    # App-wise breakdown
+    # App-wise breakdown from real data
+    app_meta = [
+        ("aisa", "AISA Web App"),
+        ("aimall", "AI Mall (AIMall)"),
+        ("efvframework", "EFV Framework"),
+        ("uwo", "UWO Web Platform"),
+        ("uwoconnect", "UWConnect"),
+        ("ailegal", "AI Legal"),
+        ("yugamc", "YUG AMC")
+    ]
     app_breakdown = [
-        {"app_code": "aisa", "label": "AISA Web App", "pageviews": int(total_pageviews * 0.32), "visitors": int(unique_visitors * 0.32)},
-        {"app_code": "aimall", "label": "AI Mall (AIMall)", "pageviews": int(total_pageviews * 0.22), "visitors": int(unique_visitors * 0.22)},
-        {"app_code": "efvframework", "label": "EFV Framework", "pageviews": int(total_pageviews * 0.16), "visitors": int(unique_visitors * 0.18)},
-        {"app_code": "uwo", "label": "UWO Web Platform", "pageviews": int(total_pageviews * 0.12), "visitors": int(unique_visitors * 0.11)},
-        {"app_code": "uwoconnect", "label": "UWConnect", "pageviews": int(total_pageviews * 0.07), "visitors": int(unique_visitors * 0.07)},
-        {"app_code": "ailegal", "label": "AI Legal", "pageviews": int(total_pageviews * 0.06), "visitors": int(unique_visitors * 0.05)},
-        {"app_code": "yugamc", "label": "YUG AMC", "pageviews": int(total_pageviews * 0.05), "visitors": int(unique_visitors * 0.05)}
+        {
+            "app_code": code,
+            "label": label,
+            "pageviews": app_pv_map.get(code, 0),
+            "visitors": len(app_vis_map.get(code, set()))
+        }
+        for code, label in app_meta
     ]
 
     return {
