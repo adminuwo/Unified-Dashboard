@@ -10,6 +10,17 @@ _last_db_error: str | None = None
 
 def get_client() -> pymongo.MongoClient:
     global _client, _last_db_error
+    import os
+    if settings.ENVIRONMENT == "testing" or os.environ.get("ENVIRONMENT") == "testing":
+        if _client is None:
+            try:
+                import mongomock  # type: ignore
+                _client = mongomock.MongoClient()
+                _last_db_error = None
+            except ImportError:
+                pass
+        return _client
+
     if _client is None:
         try:
             mongo_kwargs: Dict[str, Any] = {

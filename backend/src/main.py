@@ -29,11 +29,12 @@ from src.unified_analytics.scheduler import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle handler."""
-    init_db()
-    try:
-        start_unified_analytics_scheduler()
-    except Exception as e:
-        print(f"[lifespan] Note: Unified analytics scheduler initialization: {e}")
+    if settings.ENVIRONMENT != "testing" and os.environ.get("ENVIRONMENT") != "testing":
+        init_db()
+        try:
+            start_unified_analytics_scheduler()
+        except Exception as e:
+            print(f"[lifespan] Note: Unified analytics scheduler initialization: {e}")
     yield
     try:
         shutdown_unified_analytics_scheduler()
