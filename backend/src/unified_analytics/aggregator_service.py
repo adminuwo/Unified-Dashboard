@@ -67,24 +67,43 @@ def get_unified_overview(
 
     # 1. Total Registered Users & Real Active Users in last 24h
     user_filter: Dict[str, Any] = {}
+    event_24h_filter: Dict[str, Any] = {"created_at": {"$gte": cutoff_24h}}
     if app_code and app_code.lower() != "all":
         user_filter["connected_apps"] = app_code.lower()
+        event_24h_filter["app_code"] = app_code.lower()
 
     total_users = db["users"].count_documents(user_filter)
-    active_visitors_24h = len(db["events"].distinct("visitor_id", {"created_at": {"$gte": cutoff_24h}}))
-    active_reg_24h = db["users"].count_documents({"updated_at": {"$gte": cutoff_24h}})
-    active_users_24h = max(active_reg_24h, active_visitors_24h)
+    active_visitors_24h = len(db["events"].distinct("visitor_id", event_24h_filter))
+    active_reg_24h = db["users"].count_documents(user_filter) if user_filter else db["users"].count_documents({"updated_at": {"$gte": cutoff_24h}})
+    active_users_24h = max(active_reg_24h if user_filter else 0, active_visitors_24h)
 
     # 2. Web Metrics (Real Event & GA4 Traffic)
     web_stats = ga4_service.get_normalized_web_analytics(db, app_code=app_code, days=days)
     total_web_pageviews = web_stats.get("total_pageviews", 0)
 
-    # 3. Mobile Metrics (Google Play + App Store)
-    play_stats = playstore_service.get_playstore_analytics(db, days=days)
-    appstore_stats = appstore_service.get_appstore_analytics(db, days=days)
-    android_installs = play_stats.get("total_installs", 0)
-    ios_units = appstore_stats.get("total_units", 0)
-    total_mobile_installs = android_installs + ios_units
+    # 3. Mobile Metrics (Google Play + App Store) filtered by app
+    mobile_project_map = {
+        "aisa": "AISA",
+        "ailegal": "AI_LEGAL",
+        "uwoconnect": "UWO_CONNECT"
+    }
+    target_project = None
+    if app_code and app_code.lower() != "all":
+        target_project = mobile_project_map.get(app_code.lower(), "NONE")
+
+    if target_project == "NONE":
+        # Selected app has no mobile app (e.g. aimall, efvframework, uwo, yugamc)
+        play_stats = {"total_installs": 0, "timeline": []}
+        appstore_stats = {"total_units": 0, "timeline": []}
+        android_installs = 0
+        ios_units = 0
+        total_mobile_installs = 0
+    else:
+        play_stats = playstore_service.get_playstore_analytics(db, project=target_project, days=days)
+        appstore_stats = appstore_service.get_appstore_analytics(db, project=target_project, days=days)
+        android_installs = play_stats.get("total_installs", 0)
+        ios_units = appstore_stats.get("total_units", 0)
+        total_mobile_installs = android_installs + ios_units
 
     # 4. Real Revenue Calculation from Payments
     payment_query: Dict[str, Any] = {"status": "captured", "created_at": {"$gte": cutoff}}
