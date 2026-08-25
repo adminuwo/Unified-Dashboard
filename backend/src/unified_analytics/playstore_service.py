@@ -131,33 +131,18 @@ def sync_playstore_data(db: Database) -> Dict[str, Any]:
     for proj_key, meta in PROJECT_MAPPINGS.items():
         try:
             records = fetch_google_play_metrics(meta["package_name"], creds)
-            if not records:
-                # Upsert daily baseline record
-                baseline_val = 195 if proj_key == "AISA" else 110
+            for r in records:
                 upsert_store_analytic_record(
                     db=db,
                     project=proj_key,
                     platform="android",
                     package_name=meta["package_name"],
-                    date_str=now_str,
-                    metric="installs",
-                    value=baseline_val,
+                    date_str=r.get("date", now_str),
+                    metric=r.get("metric", "installs"),
+                    value=int(r.get("value", 0)),
                     source="google_play_reporting_api"
                 )
                 synced_records += 1
-            else:
-                for r in records:
-                    upsert_store_analytic_record(
-                        db=db,
-                        project=proj_key,
-                        platform="android",
-                        package_name=meta["package_name"],
-                        date_str=r.get("date", now_str),
-                        metric=r.get("metric", "installs"),
-                        value=int(r.get("value", 0)),
-                        source="google_play_reporting_api"
-                    )
-                    synced_records += 1
         except Exception as e:
             logger.warning(f"Error syncing Play Store data for {proj_key}: {e}")
 

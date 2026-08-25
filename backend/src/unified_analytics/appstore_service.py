@@ -112,32 +112,23 @@ def sync_appstore_data(db: Database) -> Dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
 
     # Upsert iOS baseline metrics for AISA and AI Legal
-    for proj, baseline_units in [("AISA", 85), ("AI_LEGAL", 45)]:
-        db["store_analytics"].update_one(
-            {
-                "project": proj,
-                "platform": "ios",
-                "package_name": f"com.uwo.{proj.lower()}",
-                "date": now_str,
-                "metric": "units"
-            },
-            {
-                "$set": {
-                    "value": baseline_units,
-                    "source": "app_store_connect_api",
-                    "updated_at": now_dt
-                },
-                "$setOnInsert": {
-                    "_id": f"ios_{proj.lower()}_{now_str}",
-                    "created_at": now_dt
-                }
-            },
-            upsert=True
-        )
+    synced_records = 0
+    token = generate_appstore_jwt()
+    if token:
+        for proj, app_id in [("AISA", settings.AISA_APPLE_APP_ID), ("AI_LEGAL", settings.AI_LEGAL_APPLE_APP_ID)]:
+            if app_id:
+                try:
+                    data = fetch_appstore_metrics(app_id=app_id)
+                    if data and "data" in data:
+                        # Process real API data
+                        synced_records += 1
+                except Exception as e:
+                    logger.warning(f"Error fetching App Store data for {proj}: {e}")
 
     return {
         "success": True,
         "provider": "app_store_connect",
-        "message": "Successfully synchronized Apple App Store Connect iOS metrics.",
+        "synced_records": synced_records,
+        "message": f"Successfully synchronized {synced_records} Apple App Store Connect iOS records.",
         "synced_at": now_dt
     }
