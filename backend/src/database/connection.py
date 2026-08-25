@@ -6,11 +6,10 @@ from src.config.settings import settings
 
 _client: pymongo.MongoClient | None = None
 _last_db_error: str | None = None
-_is_mongomock: bool = False
 
 
 def get_client() -> pymongo.MongoClient:
-    global _client, _last_db_error, _is_mongomock
+    global _client, _last_db_error
     if _client is None:
         try:
             mongo_kwargs: Dict[str, Any] = {
@@ -27,15 +26,12 @@ def get_client() -> pymongo.MongoClient:
             # Test ping to verify cluster reachability
             client.admin.command('ping')
             _client = client
-            _is_mongomock = False
             _last_db_error = None
             print("[Database Connection] Connected successfully to MongoDB Atlas cluster.")
         except Exception as e:
             _last_db_error = str(e)
-            _is_mongomock = True
-            print(f"[Database Connection] MongoDB Atlas cluster unreachable ({e}). Falling back to in-memory database.")
-            import mongomock
-            _client = mongomock.MongoClient()
+            print(f"[Database Connection ERROR] Failed to connect to MongoDB Atlas cluster: {e}")
+            raise RuntimeError(f"Critical Database Error: Unable to connect to MongoDB Atlas cluster: {e}")
     return _client
 
 
@@ -126,10 +122,6 @@ def init_db(db: Database | None = None):
 
 def check_db_connection(db: Database) -> str:
     """Verify database connectivity."""
-    global _is_mongomock, _last_db_error
-    if _is_mongomock:
-        err_msg = f" (error: {_last_db_error})" if _last_db_error else ""
-        return f"in-memory fallback{err_msg}"
     try:
         db.command("ping")
         return "connected (Atlas)"
