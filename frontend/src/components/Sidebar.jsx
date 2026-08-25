@@ -5,10 +5,10 @@ export const Sidebar = ({ currentTab, setTab }) => {
   const { adminUsername, logout } = useAuth();
 
   const navItems = [
-    { id: 'unified_analytics', label: 'Unified Analytics', icon: '🌐' },
+    // { id: 'unified_analytics', label: 'Unified Analytics', icon: '🌐' },
     { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'overlap', label: 'App Analytics', icon: '📈' },
-    { id: 'auth_tester', label: 'Auth Service', icon: '🔒' },
+    // { id: 'overlap', label: 'App Analytics', icon: '📈' },
+    // { id: 'auth_tester', label: 'Auth Service', icon: '🔒' },
     { id: 'applications', label: 'Application Keys', icon: '🔑' },
     { id: 'chat_tracking', label: 'Chat Tracking', icon: '💬' },
     { id: 'app_downloads', label: 'App Downloads', icon: '📥' },
