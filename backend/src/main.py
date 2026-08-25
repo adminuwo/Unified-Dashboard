@@ -29,17 +29,19 @@ from src.unified_analytics.scheduler import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle handler."""
-    if settings.ENVIRONMENT != "testing" and os.environ.get("ENVIRONMENT") != "testing":
+    is_test = settings.ENVIRONMENT.lower() == "testing" or os.environ.get("ENVIRONMENT", "").lower() == "testing"
+    if not is_test:
         init_db()
         try:
             start_unified_analytics_scheduler()
         except Exception as e:
             print(f"[lifespan] Note: Unified analytics scheduler initialization: {e}")
     yield
-    try:
-        shutdown_unified_analytics_scheduler()
-    except Exception:
-        pass
+    if not is_test:
+        try:
+            shutdown_unified_analytics_scheduler()
+        except Exception:
+            pass
 
 
 # Disable Swagger UI & OpenAPI schema in production environment for security hardening

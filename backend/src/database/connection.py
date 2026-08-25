@@ -22,6 +22,11 @@ def get_client() -> pymongo.MongoClient:
         return _client
 
     if _client is None:
+        if settings.ENVIRONMENT.lower() == "testing":
+            import mongomock  # type: ignore
+            _client = mongomock.MongoClient()
+            return _client
+
         try:
             mongo_kwargs: Dict[str, Any] = {
                 "serverSelectionTimeoutMS": 10000,
