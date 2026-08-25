@@ -10,9 +10,11 @@ from src.telemetry.schemas import (
     ChatTrackingResponse,
     AppDownloadCreateRequest,
     AppDownloadResponse,
-    TelemetryOverviewResponse
+    TelemetryOverviewResponse,
+    TelemetrySyncResponse
 )
-from src.telemetry import service
+from src.telemetry import service, schemas
+
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry & AI Tracking"])
 
@@ -39,6 +41,14 @@ def submit_app_download(
     return AppDownloadResponse(**entry.to_dict())
 
 
+@router.post("/sync", response_model=schemas.TelemetrySyncResponse)
+def trigger_telemetry_sync(
+    db: Database = Depends(get_db)
+):
+    """Trigger real-time telemetry sync from connected AI applications."""
+    return service.sync_connected_apps_telemetry(db)
+
+
 @router.get("/overview", response_model=TelemetryOverviewResponse)
 def get_telemetry_overview(
     app_code: Optional[str] = Query(None, description="Filter by application code: ailegal, aisa, aiads, uwoconnect, efvframework"),
@@ -46,3 +56,4 @@ def get_telemetry_overview(
 ):
     """Fetch aggregated chat tracking, token consumption, and app download metrics."""
     return service.get_telemetry_overview(db, app_code=app_code)
+

@@ -53,8 +53,19 @@ class AppDownloadResponse(BaseModel):
 class TelemetryOverviewResponse(BaseModel):
     app_code: Optional[str] = None
     total_chat_sessions: int
+    total_prompts: int = 0
     total_tokens: int
     avg_latency_ms: float
     total_downloads: int
     downloads_by_platform: Dict[str, int]
     model_share: List[Dict[str, Any]]
+    timeline: Optional[List[Dict[str, Any]]] = None
+    recent_sessions: Optional[List[Dict[str, Any]]] = None
+
+
+class TelemetrySyncResponse(BaseModel):
+    success: bool
+    message: str
+    records_synced: int = 0
+    synced_at: datetime
+
