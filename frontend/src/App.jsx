@@ -24,7 +24,7 @@ export function App() {
   }
 
   const tabTitles = {
-    unified_analytics: { title: 'Unified Analytics & Intelligence (Phase 3)', subtitle: 'Centralized Multi-Platform Telemetry: GA4 Web, Google Play, App Store Connect & GCP Monitoring' },
+    unified_analytics: { title: 'Unified Analytics & Intelligence', subtitle: 'Centralized Multi-Platform Telemetry: GA4 Web, Google Play, App Store Connect & GCP Monitoring' },
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
