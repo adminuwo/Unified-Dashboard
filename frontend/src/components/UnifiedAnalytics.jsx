@@ -311,7 +311,7 @@ export const UnifiedAnalytics = () => {
             <option value="uwo">📦 UWO Web Platform (uwo)</option>
             <option value="uwoconnect">🔗 UWConnect (uwoconnect)</option>
             <option value="ailegal">⚖️ AI Legal (ailegal)</option>
-            <option value="aiads">📢 AI Ads (aiads)</option>
+            <option value="yugamc">🏗️ YUG AMC (yugamc)</option>
           </select>
 
           {/* Range Selector */}
@@ -951,6 +951,8 @@ export const UnifiedAnalytics = () => {
                 { name: 'EFV Web App', site: 'efvframework' },
                 { name: 'UWO Web App', site: 'uwo' },
                 { name: 'UWConnect', site: 'uwoconnect' },
+                { name: 'AI Legal Web App', site: 'ailegal' },
+                { name: 'YUG AMC Web App', site: 'yugamc' },
               ].map((item) => (
                 <div key={item.site} style={{ background: '#0f172a', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>

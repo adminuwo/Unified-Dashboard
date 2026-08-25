@@ -68,8 +68,11 @@ def get_tracker_script():
     script_content = """
 (function(){
   'use strict';
-  var script = document.currentScript || document.querySelector('script[data-site]');
-  var site = (script && script.getAttribute('data-site')) || 'general';
+  if (window.__unified_tracker_initialized) return;
+  window.__unified_tracker_initialized = true;
+
+  var script = document.currentScript || document.querySelector('script[data-site]') || document.querySelector('script[src*="tracker.js"]');
+  var site = (script && (script.getAttribute('data-site') || script.dataset.site)) || 'general';
   var scriptOrigin = (function(){
     try {
       if (script && script.src) {
@@ -77,9 +80,9 @@ def get_tracker_script():
         return u.origin;
       }
     } catch(e){}
-    return 'https://admin.uwo24.com';
+    return window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com';
   })();
-  var endpoint = (script && script.getAttribute('data-endpoint')) || (scriptOrigin + '/api/web-stats/collect');
+  var endpoint = (script && (script.getAttribute('data-endpoint') || script.dataset.endpoint)) || (scriptOrigin + '/api/web-stats/collect');
   var visitorId = localStorage.getItem('_unf_vis') || (function(){
     var id = 'v_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
     localStorage.setItem('_unf_vis', id);
@@ -120,38 +123,58 @@ def get_tracker_script():
       device: getDevice(),
       browser: getBrowser(),
       os_name: navigator.platform || 'other',
-      duration_seconds: duration || 0.0,
+      duration_seconds: typeof duration === 'number' ? Math.max(0, duration) : 0.0,
       event_data: Object.assign({
         title: document.title,
         referrer: document.referrer || '',
-        screen: window.screen.width + 'x' + window.screen.height
+        screen: (window.screen.width || 0) + 'x' + (window.screen.height || 0),
+        url: window.location.href
       }, extra || {})
     });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(endpoint, new Blob([payload], {type: 'application/json'}));
-    } else {
-      fetch(endpoint, {method: 'POST', body: payload, headers: {'Content-Type': 'application/json'}, keepalive: true}).catch(function(){});
-    }
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(endpoint, new Blob([payload], {type: 'application/json'}));
+      } else {
+        fetch(endpoint, {method: 'POST', body: payload, headers: {'Content-Type': 'application/json'}, keepalive: true}).catch(function(){});
+      }
+    } catch(e) {}
   }
 
   // Initial pageview
-  send('pageview');
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    send('pageview');
+  } else {
+    window.addEventListener('DOMContentLoaded', function(){ send('pageview'); });
+  }
 
-  // SPA Route Change Listener
+  // SPA Route Change Listeners
+  function handleTransition() {
+    var dur = (Date.now() - startTime) / 1000;
+    send('duration', {}, dur);
+    startTime = Date.now();
+    setTimeout(function() { send('pageview'); }, 50);
+  }
+
   var pushState = history.pushState;
   if (pushState) {
     history.pushState = function(){
-      var dur = (Date.now() - startTime) / 1000;
-      send('duration', {}, dur);
-      startTime = Date.now();
       var ret = pushState.apply(this, arguments);
-      send('pageview');
+      handleTransition();
       return ret;
     };
   }
-  window.addEventListener('popstate', function(){
-    send('pageview');
-  });
+
+  var replaceState = history.replaceState;
+  if (replaceState) {
+    history.replaceState = function(){
+      var ret = replaceState.apply(this, arguments);
+      handleTransition();
+      return ret;
+    };
+  }
+
+  window.addEventListener('popstate', handleTransition);
+  window.addEventListener('hashchange', handleTransition);
 
   // Page Exit Duration
   window.addEventListener('beforeunload', function(){
