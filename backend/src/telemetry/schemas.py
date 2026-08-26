@@ -61,6 +61,8 @@ class TelemetryOverviewResponse(BaseModel):
     model_share: List[Dict[str, Any]]
     timeline: Optional[List[Dict[str, Any]]] = None
     recent_sessions: Optional[List[Dict[str, Any]]] = None
+    users_tracking: Optional[List[Dict[str, Any]]] = None
+    chat_categories: Optional[List[Dict[str, Any]]] = None
 
 
 class TelemetrySyncResponse(BaseModel):

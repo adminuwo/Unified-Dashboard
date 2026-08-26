@@ -29,7 +29,7 @@ export function App() {
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
     applications: { title: 'Application API Keys', subtitle: 'Manage API credentials for connected standalone applications' },
-    chat_tracking: { title: 'AI Chat Prompt Tracking', subtitle: 'Real-time AI model token consumption and session metrics' },
+    chat_tracking: { title: 'AI Chat & User Session Analytics', subtitle: 'Real-time AI prompt tracking, token consumption & user interaction history across Web & Mobile App' },
     app_downloads: { title: 'App Downloads & Installs', subtitle: 'Platform distribution across Android, iOS, Windows and Web PWA' },
     users: { title: 'Central User Directory', subtitle: 'View registered user identities across applications' },
     revenue: { title: 'Revenue & Subscriptions', subtitle: 'Payment transactions (₹ INR) and application subscriptions' },

@@ -22,7 +22,7 @@ from src.database.connection import get_db, init_db
 from src.database.models import RevenueTransaction, RevenueRawEvent, utc_now
 
 # AISA MongoDB URI (Read-only source)
-AISA_MONGO_URI = "mongodb+srv://admin_db_user:gwmmWiKmK4wCit1L@cluster0.u5wdauj.mongodb.net/AISA?appName=Cluster0"
+AISA_MONGO_URI = settings.MONGODB_ATLAS_URI or settings.AI_LEGAL_MONGODB_URI or "mongodb+srv://admin_db_user:ailegal050804@cluster0.265idhx.mongodb.net/AISA?appName=Cluster0"
 UNIFIED_MONGO_URI = settings.MONGODB_URL
 
 

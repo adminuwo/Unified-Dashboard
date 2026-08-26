@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     MONGODB_URL: str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "unified_service_db"
+    MONGODB_ATLAS_URI: str | None = None
+    AI_LEGAL_MONGODB_URI: str | None = None
 
     JWT_SECRET: str = "super-secret-jwt-key-change-this-in-production-32-bytes"
     JWT_ALGORITHM: str = "HS256"

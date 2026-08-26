@@ -46,8 +46,26 @@ def get_client() -> pymongo.MongoClient:
             print("[Database Connection] Connected successfully to MongoDB Atlas cluster.")
         except Exception as e:
             _last_db_error = str(e)
+            err_msg = str(e)
+            if "TLSV1_ALERT_INTERNAL_ERROR" in err_msg or "SSL handshake failed" in err_msg:
+                print("\n" + "="*70)
+                print("[MongoDB Atlas Connection Notice]")
+                print("Your IP address is not whitelisted in MongoDB Atlas.")
+                print("To fix this:")
+                print("1. Go to https://cloud.mongodb.com")
+                print("2. Navigate to 'Network Access' -> 'IP Access List'")
+                print("3. Click 'Add IP Address' -> Add Current IP or 0.0.0.0/0 (Allow Anywhere)")
+                print("="*70 + "\n")
             print(f"[Database Connection ERROR] Failed to connect to MongoDB Atlas cluster: {e}")
-            raise RuntimeError(f"Critical Database Error: Unable to connect to MongoDB Atlas cluster: {e}")
+            if settings.ENVIRONMENT.lower() != "production":
+                print("[Database Connection] Falling back to local in-memory database for development mode.")
+                try:
+                    import mongomock  # type: ignore
+                    _client = mongomock.MongoClient()
+                    return _client
+                except Exception:
+                    pass
+            raise RuntimeError(f"Critical Database Error: Unable to connect to MongoDB Atlas cluster (Check Atlas Network Access / IP Whitelist): {e}")
     return _client
 
 
