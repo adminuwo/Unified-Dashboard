@@ -616,3 +616,8 @@ textarea.form-control {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.4; box-shadow: 0 0 12px currentColor; }
+}

@@ -36,9 +36,11 @@ export const AppDownloadsTab = () => {
   const [showAndroid, setShowAndroid] = useState(true);
   const [showIos, setShowIos] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [lastSynced, setLastSynced] = useState(null);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(300);
 
-  const fetchAnalytics = async () => {
-    setLoading(true);
+  const fetchAnalytics = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const appCodes = selectedApp === 'all' ? 'aisa,ailegal' : selectedApp;
       
@@ -64,23 +66,42 @@ export const AppDownloadsTab = () => {
           active_devices: { android: activeData.data?.android || [], ios: activeData.data?.ios || [] }
         });
       }
+      setLastSynced(new Date());
+      setAutoRefreshCountdown(300);
     } catch (err) {
       console.error('Failed to fetch analytics:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     fetchAnalytics();
+    const refreshInterval = setInterval(() => fetchAnalytics(true), 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
   }, [selectedApp]);
+
+  // Countdown timer display
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAutoRefreshCountdown(prev => (prev <= 1 ? 300 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Safely extract the combined stats from our backend
   const combined = analytics?.combined || {};
-  const totalDownloads = combined.daily_device_installs || 0;
-  const androidInstalls = combined.daily_device_installs || 0;
+  // Use cumulative lifetime total from manual/GCS snapshot; fallback to period sum if not set
+  const totalDownloads = (combined.total_user_installs_latest > 0
+    ? combined.total_user_installs_latest
+    : combined.daily_device_installs) || 0;
+  const androidInstalls = (combined.total_user_installs_latest > 0
+    ? combined.total_user_installs_latest
+    : combined.daily_device_installs) || 0;
   const userInstalls = combined.daily_user_installs || 0;
   const iosDownloads = combined.ios_total_downloads || 0;
+
 
   // Chart configs helper that combines Android & iOS in the same chart with legend toggles
   const makeCombinedChart = (seriesObj) => {
@@ -182,7 +203,43 @@ export const AppDownloadsTab = () => {
 
   return (
     <div>
+      {/* Auto-Sync Status Bar */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)',
+        borderRadius: '8px', padding: '8px 16px', marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', flexShrink: 0 }}></span>
+          <span style={{ fontSize: '12px', color: '#34d399', fontWeight: '600' }}>Live Data Feed Active</span>
+          {lastSynced && (
+            <span style={{ fontSize: '11px', color: '#64748b' }}>
+              • Last synced: {lastSynced.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '11px', color: '#64748b' }}>
+            Auto-refresh in <strong style={{ color: '#94a3b8' }}>{Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, '0')}</strong>
+          </span>
+          <button
+            onClick={() => fetchAnalytics(false)}
+            disabled={loading}
+            style={{
+              background: loading ? '#1e293b' : 'rgba(16, 185, 129, 0.15)',
+              color: loading ? '#64748b' : '#10b981',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '6px', padding: '4px 12px',
+              fontSize: '11px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? '⟳ Refreshing...' : '⟳ Refresh Now'}
+          </button>
+        </div>
+      </div>
+
       {/* App Code Filter Bar & Platform Toggle Bar */}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         {/* App selector */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -272,7 +329,7 @@ export const AppDownloadsTab = () => {
             <div className="metric-icon">🤖</div>
           </div>
           <div className="metric-value">{androidInstalls.toLocaleString()}</div>
-          <div className="metric-sub">{combined.active_device_installs_latest || 0} active devices ({userInstalls} users)</div>
+          <div className="metric-sub">{combined.active_device_installs_latest || 0} active devices • from Play Console</div>
         </div>
 
         <div className="metric-card" style={{ borderColor: 'rgba(56, 189, 248, 0.4)', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(15, 23, 42, 0.6) 100%)' }}>

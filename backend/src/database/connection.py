@@ -37,6 +37,16 @@ def get_client() -> pymongo.MongoClient:
                 mongo_kwargs["tlsCAFile"] = certifi.where()
             except ImportError:
                 pass
+            try:
+                import dns.resolver
+                # Configure dnspython to use public DNS servers to resolve MongoDB SRV records reliably
+                resolver = dns.resolver.Resolver(configure=False)
+                resolver.nameservers = ['8.8.8.8', '1.1.1.1']
+                dns.resolver.default_resolver = resolver
+                print("[Database Connection] Configured public DNS resolvers for MongoDB SRV resolution.")
+            except Exception as dns_err:
+                print(f"[Database Connection Warning] Failed to configure dns.resolver: {dns_err}")
+                
             client = pymongo.MongoClient(settings.MONGODB_URL, **mongo_kwargs)
 
             # Test ping to verify cluster reachability

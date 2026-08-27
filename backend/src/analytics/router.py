@@ -286,3 +286,63 @@ def get_status(
         }
     }
 
+
+@router.post("/google-play/manual-update")
+def manual_update_installs(
+    payload: dict,
+    db: Database = Depends(get_db),
+    admin: str = Depends(get_current_admin)
+):
+    """
+    Manually update the cumulative install totals for an app from Google Play Console.
+    
+    Body: { "app_code": "ailegal", "total_installs": 420, "active_devices": 154, "as_of_date": "2026-08-27" }
+    """
+    from datetime import datetime, timezone
+    app_code = payload.get("app_code")
+    total_installs = int(payload.get("total_installs", 0))
+    active_devices = int(payload.get("active_devices", 0))
+    as_of_date = payload.get("as_of_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    if not app_code:
+        return {"success": False, "error": "app_code is required"}
+
+    # Upsert the manual snapshot for today
+    from src.database.models import generate_uuid, utc_now
+    doc_id = f"manual_{app_code}_{as_of_date}"
+    db["play_install_metrics"].update_one(
+        {"_id": doc_id},
+        {"$set": {
+            "app_code": app_code,
+            "metric_date": as_of_date,
+            "dimension_type": "overview",
+            "dimension_value": None,
+            "dimension_value_normalized": "__overall__",
+            "total_user_installs": total_installs,
+            "installs_on_active_devices": active_devices,
+            "current_user_installs": total_installs,
+            "current_device_installs": active_devices,
+            "daily_user_installs": 0,
+            "daily_device_installs": 0,
+            "daily_user_uninstalls": 0,
+            "daily_device_uninstalls": 0,
+            "net_daily_user_installs": 0,
+            "net_daily_device_installs": 0,
+            "install_events": total_installs,
+            "uninstall_events": 0,
+            "update_events": 0,
+            "source_file_id": "manual_console_entry",
+            "source_generation": "manual",
+            "updated_at": utc_now()
+        }},
+        upsert=True
+    )
+
+    return {
+        "success": True,
+        "message": f"Updated {app_code} manual snapshot: {total_installs} total installs, {active_devices} active devices as of {as_of_date}",
+        "app_code": app_code,
+        "total_installs": total_installs,
+        "active_devices": active_devices,
+        "as_of_date": as_of_date
+    }

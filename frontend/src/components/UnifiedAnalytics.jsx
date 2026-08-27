@@ -44,6 +44,7 @@ export const UnifiedAnalytics = () => {
   const [webData, setWebData] = useState(null);
   const [gcpData, setGcpData] = useState(null);
   const [activityData, setActivityData] = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
 
   const daysParam = dateRange === '24h' ? 1 : dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : 30;
 
@@ -68,11 +69,15 @@ export const UnifiedAnalytics = () => {
       setFeedback({ type: 'error', message: 'Failed to load telemetry data.' });
     } finally {
       setLoading(false);
+      setLastSynced(new Date());
     }
   };
 
   useEffect(() => {
     fetchTabData();
+    // Auto-refresh every 5 minutes silently
+    const interval = setInterval(fetchTabData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [activeSubTab, appCode, dateRange]);
 
   const handleSyncAll = async () => {
@@ -276,6 +281,15 @@ export const UnifiedAnalytics = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.12)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(245, 158, 11, 0.3)', fontSize: '12px', color: '#fde68a' }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }}></span>
           <span><strong>Cloud Monitoring:</strong> 99.9% Uptime</span>
+        </div>
+
+        {/* Auto-refresh indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(56, 189, 248, 0.08)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '12px', color: '#7dd3fc', marginLeft: 'auto' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#38bdf8', animation: 'pulse 2s infinite' }}></span>
+          <span>
+            <strong>Auto-Refresh:</strong> Every 5 min
+            {lastSynced && <span style={{ color: '#64748b', marginLeft: '8px' }}>• Last: {lastSynced.toLocaleTimeString()}</span>}
+          </span>
         </div>
       </div>
 
