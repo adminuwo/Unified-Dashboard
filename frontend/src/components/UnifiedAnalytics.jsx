@@ -42,10 +42,8 @@ export const UnifiedAnalytics = () => {
   // Sub-tab data states
   const [overviewData, setOverviewData] = useState(null);
   const [webData, setWebData] = useState(null);
-  const [mobileData, setMobileData] = useState(null);
   const [gcpData, setGcpData] = useState(null);
   const [activityData, setActivityData] = useState(null);
-  const [revenueData, setRevenueData] = useState(null);
 
   const daysParam = dateRange === '24h' ? 1 : dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : 30;
 
@@ -58,18 +56,12 @@ export const UnifiedAnalytics = () => {
       } else if (activeSubTab === 'web') {
         const res = await authFetch(`/api/admin/unified-analytics/web?app_code=${appCode}&days=${daysParam}`);
         if (res.ok) setWebData(await res.json());
-      } else if (activeSubTab === 'mobile') {
-        const res = await authFetch(`/api/admin/unified-analytics/mobile?project=${appCode === 'all' ? 'ALL' : appCode.toUpperCase()}&days=${daysParam}`);
-        if (res.ok) setMobileData(await res.json());
       } else if (activeSubTab === 'backend_monitoring') {
         const res = await authFetch(`/api/admin/unified-analytics/backend-monitoring?hours=${dateRange === '24h' ? 24 : 48}`);
         if (res.ok) setGcpData(await res.json());
       } else if (activeSubTab === 'user_activity') {
         const res = await authFetch(`/api/admin/unified-analytics/user-activity?app_code=${appCode}&days=${daysParam}`);
         if (res.ok) setActivityData(await res.json());
-      } else if (activeSubTab === 'revenue') {
-        const res = await authFetch(`/api/admin/unified-analytics/revenue?days=${daysParam}`);
-        if (res.ok) setRevenueData(await res.json());
       }
     } catch (err) {
       console.error('Failed to fetch unified analytics:', err);
@@ -123,14 +115,38 @@ export const UnifiedAnalytics = () => {
         backgroundColor: 'rgba(99, 102, 241, 0.15)',
         fill: true,
         tension: 0.2
-      },
+      }
+    ]
+  };
+
+  const appBreakdownLabels = overviewData?.app_breakdown?.map((app) => app.name) || [];
+  const appBreakdownUsers = overviewData?.app_breakdown?.map((app) => app.users) || [];
+  
+  const appShareChartData = {
+    labels: appBreakdownLabels,
+    datasets: [
       {
-        label: 'Mobile Installs (Play & App Store)',
-        data: overviewData?.timeline?.map((t) => t.mobile_installs) || [],
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        fill: true,
-        tension: 0.2
+        label: 'Active Users',
+        data: appBreakdownUsers,
+        backgroundColor: [
+          'rgba(139, 92, 246, 0.65)',  // AISA
+          'rgba(236, 72, 153, 0.65)',  // AI Mall
+          'rgba(245, 158, 11, 0.65)',  // EFV
+          'rgba(59, 130, 246, 0.65)',  // UWO
+          'rgba(16, 185, 129, 0.65)',  // UWConnect
+          'rgba(99, 102, 241, 0.65)',  // AI Legal
+          'rgba(20, 184, 166, 0.65)',  // YUG AMC
+        ],
+        borderColor: [
+          '#8b5cf6',
+          '#ec4899',
+          '#f59e0b',
+          '#3b82f6',
+          '#10b981',
+          '#6366f1',
+          '#14b8a6',
+        ],
+        borderWidth: 1
       }
     ]
   };
@@ -158,28 +174,7 @@ export const UnifiedAnalytics = () => {
     ]
   };
 
-  const mobileLabels = mobileData?.android_timeline?.map((t) => t.date) || [];
-  const mobileChartData = {
-    labels: mobileLabels,
-    datasets: [
-      {
-        label: 'Google Play Installs (Android)',
-        data: mobileData?.android_timeline?.map((t) => t.installs) || [],
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-        fill: true,
-        tension: 0.2
-      },
-      {
-        label: 'Apple App Store Units (iOS)',
-        data: mobileData?.ios_timeline?.map((t) => t.units) || [],
-        borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.2)',
-        fill: true,
-        tension: 0.2
-      }
-    ]
-  };
+
 
   const gcpLabels = gcpData?.timeline?.map((t) => t.time) || [];
   const gcpChartData = {
@@ -232,10 +227,8 @@ export const UnifiedAnalytics = () => {
   const subTabs = [
     { id: 'overview', label: 'Executive Overview', icon: '📊', category: 'General' },
     { id: 'web', label: 'Web Traffic & GA4', icon: '🌐', category: 'Web' },
-    { id: 'mobile', label: 'Mobile App Stores', icon: '📱', category: 'Mobile' },
     { id: 'backend_monitoring', label: 'Cloud Health & Latency', icon: '☁️', category: 'DevOps' },
     { id: 'user_activity', label: 'AI Tokens & Prompts', icon: '🤖', category: 'AI' },
-    { id: 'revenue', label: 'Revenue & Ledger', icon: '💳', category: 'Fintech' },
   ];
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -279,10 +272,7 @@ export const UnifiedAnalytics = () => {
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
           <span><strong>Google Play:</strong> Synced</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(56, 189, 248, 0.12)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '12px', color: '#bae6fd' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }}></span>
-          <span><strong>App Store:</strong> Linked</span>
-        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245, 158, 11, 0.12)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(245, 158, 11, 0.3)', fontSize: '12px', color: '#fde68a' }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }}></span>
           <span><strong>Cloud Monitoring:</strong> 99.9% Uptime</span>
@@ -442,7 +432,7 @@ export const UnifiedAnalytics = () => {
           <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
             <div className="metric-card" style={{ background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '12px', padding: '20px' }}>
               <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total Registered Users</span>
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total Active Users</span>
                 <div className="metric-icon" style={{ fontSize: '18px', background: 'rgba(99, 102, 241, 0.15)', padding: '6px', borderRadius: '8px' }}>👥</div>
               </div>
               <div className="metric-value" style={{ fontSize: '28px', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.02em' }}>
@@ -466,31 +456,7 @@ export const UnifiedAnalytics = () => {
               </div>
             </div>
 
-            <div className="metric-card" style={{ background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '12px', padding: '20px' }}>
-              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Mobile App Installs</span>
-                <div className="metric-icon" style={{ fontSize: '18px', background: 'rgba(16, 185, 129, 0.15)', padding: '6px', borderRadius: '8px' }}>📱</div>
-              </div>
-              <div className="metric-value" style={{ fontSize: '28px', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.02em' }}>
-                {overviewData?.total_mobile_installs?.toLocaleString() || 0}
-              </div>
-              <div className="metric-sub" style={{ fontSize: '12px', color: '#34d399', marginTop: '6px', fontWeight: '500' }}>
-                Android (Play) & iOS (App Store)
-              </div>
-            </div>
 
-            <div className="metric-card" style={{ background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '12px', padding: '20px' }}>
-              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total Platform Revenue</span>
-                <div className="metric-icon" style={{ fontSize: '18px', background: 'rgba(16, 185, 129, 0.15)', padding: '6px', borderRadius: '8px' }}>💳</div>
-              </div>
-              <div className="metric-value" style={{ fontSize: '28px', fontWeight: '800', color: '#10b981', letterSpacing: '-0.02em' }}>
-                ₹{overviewData?.total_revenue?.toLocaleString() || 0}
-              </div>
-              <div className="metric-sub" style={{ fontSize: '12px', color: '#6ee7b7', marginTop: '6px', fontWeight: '500' }}>
-                Captured Transactions (INR)
-              </div>
-            </div>
           </div>
 
           {/* Timeline Chart */}
@@ -519,7 +485,98 @@ export const UnifiedAnalytics = () => {
             </div>
           </div>
 
-          {/* App Breakdown Table */}
+          {/* Ecosystem Platform Distribution Section */}
+          <div className="card-section" style={{ marginTop: '24px', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+            <div className="section-header" style={{ marginBottom: '20px' }}>
+              <div className="section-title" style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc' }}>
+                Ecosystem User Distribution & Share
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                Visual breakdown of active users across all connected applications
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px', alignItems: 'center' }}>
+              <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600', marginBottom: '10px' }}>Platform Share Percentage</div>
+                <div style={{ height: '250px', width: '100%', display: 'flex', justifyContent: 'center' }}>
+                  {loading ? (
+                    <div style={{ color: '#94a3b8', textAlign: 'center', paddingTop: '60px' }}>Loading...</div>
+                  ) : (
+                    <Doughnut 
+                      data={appShareChartData} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            display: false
+                          }
+                        }
+                      }} 
+                    />
+                  )}
+                </div>
+              </div>
+              
+              <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600', marginBottom: '10px' }}>Active User Volumes</div>
+                <div style={{ height: '250px', width: '100%' }}>
+                  {loading ? (
+                    <div style={{ color: '#94a3b8', textAlign: 'center', paddingTop: '60px' }}>Loading...</div>
+                  ) : (
+                    <Bar 
+                      data={appShareChartData} 
+                      options={{
+                        indexAxis: 'y', // Horizontal Bar Chart
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false }
+                        },
+                        scales: {
+                          x: { ticks: { color: '#64748b', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                          y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                        }
+                      }} 
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Real-time Numeric Summary Card */}
+              <div style={{ background: '#0f172a', padding: '18px 20px', borderRadius: '10px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '13px', color: '#f8fafc', fontWeight: '700', marginBottom: '14px', borderBottom: '1px solid #1e293b', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>📋 Real-Time Registry</span>
+                  <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '10px' }}>● Live</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {overviewData?.app_breakdown?.map((app, idx) => {
+                    const colors = [
+                      '#8b5cf6', // AISA
+                      '#ec4899', // AI Mall
+                      '#f59e0b', // EFV
+                      '#3b82f6', // UWO
+                      '#10b981', // UWConnect
+                      '#6366f1', // AI Legal
+                      '#14b8a6', // YUG AMC
+                    ];
+                    return (
+                      <div key={app.app_code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: colors[idx % colors.length] }}></span>
+                          <span style={{ color: '#94a3b8', fontWeight: '500' }}>{app.name}</span>
+                        </div>
+                        <span style={{ color: '#38bdf8', fontWeight: '700' }}>{app.users?.toLocaleString() || 0} active</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Connected Ecosystem Platforms Table */}
           <div className="card-section" style={{ marginTop: '24px', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
             <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
               <div>
@@ -527,7 +584,7 @@ export const UnifiedAnalytics = () => {
                   Connected Ecosystem Platforms
                 </div>
                 <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                  Real-time telemetry, user allocation & revenue contribution across all 7 platforms
+                  Real-time telemetry, user allocation & live sync status across all 7 platforms
                 </div>
               </div>
               <input
@@ -555,7 +612,6 @@ export const UnifiedAnalytics = () => {
                     <th style={{ padding: '10px 12px' }}>Category</th>
                     <th style={{ padding: '10px 12px' }}>App Code</th>
                     <th style={{ padding: '10px 12px' }}>Registered Users</th>
-                    <th style={{ padding: '10px 12px' }}>Revenue Contribution</th>
                     <th style={{ padding: '10px 12px' }}>Telemetry Status</th>
                     <th style={{ padding: '10px 12px', textAlign: 'right' }}>Quick Actions</th>
                   </tr>
@@ -605,9 +661,6 @@ export const UnifiedAnalytics = () => {
                           <td style={{ padding: '12px', color: '#e2e8f0', fontWeight: '500' }}>
                             {app.users?.toLocaleString() || 0}
                           </td>
-                          <td style={{ padding: '12px', color: '#10b981', fontWeight: '600' }}>
-                            ₹{app.revenue?.toLocaleString() || 0}
-                          </td>
                           <td style={{ padding: '12px' }}>
                             <span style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
                               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
@@ -638,6 +691,7 @@ export const UnifiedAnalytics = () => {
               </table>
             </div>
           </div>
+
         </div>
       )}
 
@@ -749,87 +803,6 @@ export const UnifiedAnalytics = () => {
         </div>
       )}
 
-      {/* ─── TAB 3: MOBILE ANALYTICS ─────────────────────────────────────────── */}
-      {activeSubTab === 'mobile' && (
-        <div>
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Google Play Installs (Android)</span>
-                <div className="metric-icon">📱</div>
-              </div>
-              <div className="metric-value">{mobileData?.total_android_installs?.toLocaleString() || 0}</div>
-              <div className="metric-sub">Google Play Console Total</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>App Store Units (iOS)</span>
-                <div className="metric-icon">🍏</div>
-              </div>
-              <div className="metric-value">{mobileData?.total_ios_units?.toLocaleString() || 0}</div>
-              <div className="metric-sub">Apple App Store Connect</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Active Mobile Devices</span>
-                <div className="metric-icon">⚡</div>
-              </div>
-              <div className="metric-value">{mobileData?.active_devices?.toLocaleString() || 0}</div>
-              <div className="metric-sub">Retained active installations</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Avg App Store Rating</span>
-                <div className="metric-icon">⭐</div>
-              </div>
-              <div className="metric-value" style={{ color: '#f59e0b' }}>
-                {mobileData?.avg_rating || 4.8} / 5.0
-              </div>
-              <div className="metric-sub">Crash Rate: {mobileData?.crash_rate_pct || 0.15}%</div>
-            </div>
-          </div>
-
-          <div className="card-section" style={{ marginTop: '24px' }}>
-            <div className="section-header">
-              <div className="section-title">Android vs iOS Install Trends</div>
-            </div>
-            <div style={{ height: '300px' }}>
-              <Line data={mobileChartData} options={chartOptions} />
-            </div>
-          </div>
-
-          <div className="card-section" style={{ marginTop: '24px' }}>
-            <div className="section-header">
-              <div className="section-title">Mobile Projects (AISA & AI Legal)</div>
-            </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Android Installs</th>
-                  <th>iOS Units</th>
-                  <th>Total Downloads</th>
-                  <th>Rating</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mobileData?.app_breakdown?.map((item) => (
-                  <tr key={item.project}>
-                    <td><strong>{item.name}</strong></td>
-                    <td>{item.android_installs?.toLocaleString()}</td>
-                    <td>{item.ios_units?.toLocaleString()}</td>
-                    <td><strong>{(item.android_installs + item.ios_units)?.toLocaleString()}</strong></td>
-                    <td>⭐ {item.rating}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* ─── TAB 4: BACKEND & LATENCY (GCP) ──────────────────────────────────── */}
       {activeSubTab === 'backend_monitoring' && (
@@ -982,100 +955,6 @@ export const UnifiedAnalytics = () => {
         </div>
       )}
 
-      {/* ─── TAB 6: REVENUE BREAKDOWN ────────────────────────────────────────── */}
-      {activeSubTab === 'revenue' && (
-        <div>
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Total Captured Revenue</span>
-                <div className="metric-icon">💳</div>
-              </div>
-              <div className="metric-value" style={{ color: '#10b981' }}>
-                ₹{revenueData?.total_revenue?.toLocaleString() || 0}
-              </div>
-              <div className="metric-sub">Payment Gateway Volume ({revenueData?.currency || 'INR'})</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Monthly Recurring Revenue (MRR)</span>
-                <div className="metric-icon">📈</div>
-              </div>
-              <div className="metric-value">₹{revenueData?.mrr?.toLocaleString() || 0}</div>
-              <div className="metric-sub">Normalized Active Subscriptions</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Active Subscribers</span>
-                <div className="metric-icon">👑</div>
-              </div>
-              <div className="metric-value">{revenueData?.active_subscribers || 0}</div>
-              <div className="metric-sub">Paid active accounts</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-header">
-                <span>Total Transactions</span>
-                <div className="metric-icon">🧾</div>
-              </div>
-              <div className="metric-value">{revenueData?.transactions_count || 0}</div>
-              <div className="metric-sub">Razorpay verified charges</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
-            <div className="card-section">
-              <div className="section-header">
-                <div className="section-title">Subscription Plan Distribution</div>
-              </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Plan</th>
-                    <th>Subscribers</th>
-                    <th>Revenue (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revenueData?.plan_distribution?.map((p, idx) => (
-                    <tr key={idx}>
-                      <td><strong>{p.plan}</strong></td>
-                      <td>{p.subscribers}</td>
-                      <td>₹{p.revenue?.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="card-section">
-              <div className="section-header">
-                <div className="section-title">Revenue by Connected Application</div>
-              </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Application</th>
-                    <th>Revenue (₹)</th>
-                    <th>Contribution</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {revenueData?.app_revenue?.map((app, idx) => (
-                    <tr key={idx}>
-                      <td><strong>{app.name}</strong> (<code>{app.app_code}</code>)</td>
-                      <td>₹{app.revenue?.toLocaleString()}</td>
-                      <td><span className="badge badge-success">{app.pct}%</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── EMBED SNIPPET MODAL ─────────────────────────────────────────────── */}
       {showSnippetModal && (

@@ -65,54 +65,109 @@ def get_unified_overview(
     cutoff = now - timedelta(days=days)
     cutoff_24h = now - timedelta(hours=24)
 
-    # 1. Total Registered Users & Real Active Users in last 24h
-    user_filter: Dict[str, Any] = {}
-    event_24h_filter: Dict[str, Any] = {"created_at": {"$gte": cutoff_24h}}
+    # 1. Real Revenue Calculation from revenue_transactions
+    payment_query: Dict[str, Any] = {"status": "completed", "transaction_date": {"$gte": cutoff}}
     if app_code and app_code.lower() != "all":
-        user_filter["connected_apps"] = app_code.lower()
-        event_24h_filter["app_code"] = app_code.lower()
+        payment_query["product_code"] = app_code.lower()
 
-    total_users = db["users"].count_documents(user_filter)
-    active_visitors_24h = len(db["events"].distinct("visitor_id", event_24h_filter))
-    active_reg_24h = db["users"].count_documents(user_filter) if user_filter else db["users"].count_documents({"updated_at": {"$gte": cutoff_24h}})
-    active_users_24h = max(active_reg_24h if user_filter else 0, active_visitors_24h)
+    payments_cursor = db["revenue_transactions"].find(payment_query)
+    payments_list = list(payments_cursor)
+    total_rev = sum(float(p.get("gross_amount", 0.0)) for p in payments_list)
 
-    # 2. Web Metrics (Real Event & GA4 Traffic)
+    # 2. Real App Breakdown & Registered/Active Users
+    app_meta_list = [
+        ("aisa", "AISA AI Suite"),
+        ("aimall", "AI Mall (AIMall)"),
+        ("efvframework", "EFV Framework"),
+        ("uwo", "UWO Web Platform"),
+        ("uwoconnect", "UWConnect"),
+        ("ailegal", "AI Legal"),
+        ("yugamc", "YUG AMC")
+    ]
+    
+    app_breakdown = []
+    for ac, aname in app_meta_list:
+        if ac in ["aisa", "ailegal"]:
+            # Fetch application active users from chat_tracking
+            distinct_u = db["chat_tracking"].distinct("user_id", {"app_code": ac, "created_at": {"$gte": cutoff}})
+            distinct_u = [u for u in distinct_u if u]
+            app_users = len(distinct_u)
+            if app_users == 0:
+                app_users = len(db["chat_tracking"].distinct("session_id", {"app_code": ac, "created_at": {"$gte": cutoff}}))
+        else:
+            # Fetch web active users from events
+            app_users = len(db["events"].distinct("visitor_id", {"app_code": ac, "created_at": {"$gte": cutoff}}))
+        
+        # Real Revenue from revenue_transactions
+        app_rev_sum = sum(float(p.get("gross_amount", 0.0)) for p in payments_list if (p.get("product_code") or "").lower() == ac)
+        
+        app_breakdown.append({
+            "app_code": ac,
+            "name": aname,
+            "users": app_users,
+            "revenue": round(app_rev_sum, 2),
+            "status": "active"
+        })
+
+    # Total active users in selected horizon (sum of apps to maintain consistency)
+    if not app_code or app_code.lower() == "all":
+        total_users = sum(app["users"] for app in app_breakdown)
+    else:
+        total_users = next((app["users"] for app in app_breakdown if app["app_code"] == app_code.lower()), 0)
+
+    # Active users in last 24h
+    active_24h_breakdown = []
+    for ac, _ in app_meta_list:
+        if ac in ["aisa", "ailegal"]:
+            distinct_u24 = db["chat_tracking"].distinct("user_id", {"app_code": ac, "created_at": {"$gte": cutoff_24h}})
+            distinct_u24 = [u for u in distinct_u24 if u]
+            users_24h = len(distinct_u24)
+            if users_24h == 0:
+                users_24h = len(db["chat_tracking"].distinct("session_id", {"app_code": ac, "created_at": {"$gte": cutoff_24h}}))
+        else:
+            users_24h = len(db["events"].distinct("visitor_id", {"app_code": ac, "created_at": {"$gte": cutoff_24h}}))
+        active_24h_breakdown.append(users_24h)
+        
+    if not app_code or app_code.lower() == "all":
+        active_users_24h = sum(active_24h_breakdown)
+    else:
+        app_idx = [x[0] for x in app_meta_list].index(app_code.lower())
+        active_users_24h = active_24h_breakdown[app_idx]
+
+    # 3. Web Metrics (Real Event & GA4 Traffic)
     web_stats = ga4_service.get_normalized_web_analytics(db, app_code=app_code, days=days)
     total_web_pageviews = web_stats.get("total_pageviews", 0)
 
-    # 3. Mobile Metrics (Google Play + App Store) filtered by app
-    mobile_project_map = {
-        "aisa": "AISA",
-        "ailegal": "AI_LEGAL",
-        "uwoconnect": "UWO_CONNECT"
+    # 4. Mobile Metrics (Google Play + App Store) using real play_install_metrics & app_store_metrics
+    play_filter: Dict[str, Any] = {
+        "dimension_type": "overview",
+        "metric_date": {"$gte": cutoff.strftime("%Y-%m-%d")}
     }
-    target_project = None
+    ios_filter: Dict[str, Any] = {
+        "metric_date": {"$gte": cutoff.strftime("%Y-%m-%d")}
+    }
+    
     if app_code and app_code.lower() != "all":
-        target_project = mobile_project_map.get(app_code.lower(), "NONE")
-
-    if target_project == "NONE":
-        # Selected app has no mobile app (e.g. aimall, efvframework, uwo, yugamc)
-        play_stats = {"total_installs": 0, "timeline": []}
-        appstore_stats = {"total_units": 0, "timeline": []}
-        android_installs = 0
-        ios_units = 0
-        total_mobile_installs = 0
-    else:
-        play_stats = playstore_service.get_playstore_analytics(db, project=target_project, days=days)
-        appstore_stats = appstore_service.get_appstore_analytics(db, project=target_project, days=days)
-        android_installs = play_stats.get("total_installs", 0)
-        ios_units = appstore_stats.get("total_units", 0)
-        total_mobile_installs = android_installs + ios_units
-
-    # 4. Real Revenue Calculation from Payments
-    payment_query: Dict[str, Any] = {"status": "captured", "created_at": {"$gte": cutoff}}
-    if app_code and app_code.lower() != "all":
-        payment_query["app_code"] = app_code.lower()
-
-    payments_cursor = db["payments"].find(payment_query)
-    payments_list = list(payments_cursor)
-    total_rev = sum(float(p.get("amount", 0.0)) for p in payments_list)
+        play_filter["app_code"] = app_code.lower()
+        ios_filter["app_code"] = app_code.lower()
+        
+    play_records = list(db["play_install_metrics"].find(play_filter))
+    ios_records = list(db["app_store_metrics"].find(ios_filter))
+    
+    android_installs = sum(int(r.get("daily_device_installs", 0)) for r in play_records)
+    ios_units = sum(int(r.get("total_downloads", 0)) for r in ios_records)
+    total_mobile_installs = android_installs + ios_units
+    
+    # Maps for daily timeline builder
+    play_daily_map: Dict[str, int] = {}
+    for r in play_records:
+        d = r.get("metric_date")
+        play_daily_map[d] = play_daily_map.get(d, 0) + int(r.get("daily_device_installs", 0))
+        
+    appstore_daily_map: Dict[str, int] = {}
+    for r in ios_records:
+        d = r.get("metric_date")
+        appstore_daily_map[d] = appstore_daily_map.get(d, 0) + int(r.get("total_downloads", 0))
 
     # 5. GCP Backend Performance
     gcp_stats = gcp_monitoring_service.get_gcp_backend_monitoring(db, hours=24)
@@ -135,40 +190,14 @@ def get_unified_overview(
         "ios": {"units": ios_units, "share_pct": ios_share}
     }
 
-    # 7. Real App Breakdown
-    app_meta_list = [
-        ("aisa", "AISA AI Suite"),
-        ("aimall", "AI Mall (AIMall)"),
-        ("efvframework", "EFV Framework"),
-        ("uwo", "UWO Web Platform"),
-        ("uwoconnect", "UWConnect"),
-        ("ailegal", "AI Legal"),
-        ("yugamc", "YUG AMC")
-    ]
-    app_breakdown = []
-    for ac, aname in app_meta_list:
-        app_users = db["users"].count_documents({"connected_apps": ac})
-        if app_users == 0:
-            app_users = len(db["events"].distinct("visitor_id", {"app_code": ac, "created_at": {"$gte": cutoff}}))
-        app_rev_sum = sum(float(p.get("amount", 0.0)) for p in payments_list if (p.get("app_code") or "").lower() == ac)
-        app_breakdown.append({
-            "app_code": ac,
-            "name": aname,
-            "users": app_users,
-            "revenue": round(app_rev_sum, 2),
-            "status": "active"
-        })
-
-    # 8. Real Unified Daily Timeline
+    # 7. Real Unified Daily Timeline
     web_daily_map = {t["date"]: t.get("pageviews", 0) for t in web_stats.get("timeline", [])}
-    play_daily_map = {t["date"]: t.get("installs", 0) for t in play_stats.get("timeline", [])}
-    appstore_daily_map = {t["date"]: t.get("units", 0) for t in appstore_stats.get("timeline", [])}
 
     rev_daily_map: Dict[str, float] = {}
     for p in payments_list:
-        p_dt = p.get("created_at") or now
+        p_dt = p.get("transaction_date") or now
         p_date = p_dt.strftime("%Y-%m-%d")
-        rev_daily_map[p_date] = rev_daily_map.get(p_date, 0.0) + float(p.get("amount", 0.0))
+        rev_daily_map[p_date] = rev_daily_map.get(p_date, 0.0) + float(p.get("gross_amount", 0.0))
 
     is_hourly = (days == 1)
     timeline = []
@@ -483,6 +512,6 @@ def sync_all_providers(db: Database) -> Dict[str, Any]:
     return {
         "success": True,
         "provider": "all",
-        "message": "Successfully synchronized Google Play, App Store Connect, GA4, and GCP telemetry.",
+        "message": "Successfully synchronized Google Play, GA4, and GCP telemetry.",
         "synced_at": utc_now()
     }
