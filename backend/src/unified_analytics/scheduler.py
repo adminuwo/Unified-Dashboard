@@ -42,6 +42,8 @@ def job_sync_playstore_analytics():
         db = get_db_instance()
         logger.info("[Scheduler] Executing Google Play Store sync (6 hours)...")
         playstore_service.sync_playstore_data(db)
+        # Clear analytics cache to show fresh data immediately
+        db["analytics_cache"].delete_many({})
     except Exception as e:
         logger.error(f"[Scheduler] Error during Play Store sync: {e}")
 
@@ -52,6 +54,8 @@ def job_sync_appstore_analytics():
         db = get_db_instance()
         logger.info("[Scheduler] Executing App Store Connect sync (12 hours)...")
         appstore_service.sync_appstore_data(db)
+        # Clear analytics cache to show fresh data immediately
+        db["analytics_cache"].delete_many({})
     except Exception as e:
         logger.error(f"[Scheduler] Error during App Store sync: {e}")
 

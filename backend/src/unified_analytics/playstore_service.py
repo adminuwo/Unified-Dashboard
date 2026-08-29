@@ -123,33 +123,29 @@ def get_playstore_analytics(
 
 
 def sync_playstore_data(db: Database) -> Dict[str, Any]:
-    """Sync data from Google Play Reporting API into MongoDB."""
-    creds = parse_google_credentials()
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    synced_records = 0
-
-    for proj_key, meta in PROJECT_MAPPINGS.items():
-        try:
-            records = fetch_google_play_metrics(meta["package_name"], creds)
-            for r in records:
-                upsert_store_analytic_record(
-                    db=db,
-                    project=proj_key,
-                    platform="android",
-                    package_name=meta["package_name"],
-                    date_str=r.get("date", now_str),
-                    metric=r.get("metric", "installs"),
-                    value=int(r.get("value", 0)),
-                    source="google_play_reporting_api"
-                )
-                synced_records += 1
-        except Exception as e:
-            logger.warning(f"Error syncing Play Store data for {proj_key}: {e}")
-
-    return {
-        "success": True,
-        "provider": "google_play",
-        "synced_records": synced_records,
-        "message": f"Successfully synchronized {synced_records} Google Play records.",
-        "synced_at": datetime.now(timezone.utc)
-    }
+    """Sync data from Google Play GCS Reporting buckets into MongoDB."""
+    from src.analytics.google_play.sync_service import run_sync
+    
+    apps = [
+        {"app_code": "aisa", "package_name": settings.AISA_BUNDLE_ID or "com.uwo.aisa"},
+        {"app_code": "ailegal", "package_name": settings.AI_LEGAL_BUNDLE_ID or "com.uwo.ailegal"}
+    ]
+    bucket_name = settings.GOOGLE_PLAY_GCS_BUCKET_ID or "pubsite_prod_5002243960657921085"
+    
+    logger.info(f"Triggering automated Google Play sync for bucket: {bucket_name}...")
+    try:
+        result = run_sync(db=db, apps=apps, bucket_name=bucket_name, auth_mode="adc")
+        return {
+            "success": True,
+            "provider": "google_play",
+            "message": f"Successfully executed Google Play GCS reports sync. Result: {result}",
+            "synced_at": datetime.now(timezone.utc)
+        }
+    except Exception as e:
+        logger.error(f"Failed to execute automated Google Play sync: {e}")
+        return {
+            "success": False,
+            "provider": "google_play",
+            "error": str(e),
+            "synced_at": datetime.now(timezone.utc)
+        }

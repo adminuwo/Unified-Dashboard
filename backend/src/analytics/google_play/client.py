@@ -14,7 +14,30 @@ class GooglePlayStorageClient:
 
     def _get_client(self) -> storage.Client:
         if self._storage_client is None:
-            # We are using application default credentials (ADC)
+            import json
+            import os
+            from src.config.settings import settings
+
+            # 1. Try to load from GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or GCP_SERVICE_ACCOUNT_JSON settings
+            raw_json = settings.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON or settings.GCP_SERVICE_ACCOUNT_JSON
+            if raw_json:
+                try:
+                    info = json.loads(raw_json.strip())
+                    self._storage_client = storage.Client.from_service_account_info(info)
+                    return self._storage_client
+                except Exception as e:
+                    print(f"Failed to load GCS client from service account JSON: {e}")
+
+            # 2. Try to load from local key file path if configured/exists
+            key_path = "gcp-key.json"
+            if os.path.exists(key_path):
+                try:
+                    self._storage_client = storage.Client.from_service_account_json(key_path)
+                    return self._storage_client
+                except Exception as e:
+                    print(f"Failed to load GCS client from key file {key_path}: {e}")
+
+            # 3. Fallback to Application Default Credentials (ADC)
             credentials, project = default()
             self._storage_client = storage.Client(credentials=credentials)
         return self._storage_client

@@ -107,28 +107,29 @@ def get_appstore_analytics(
 
 
 def sync_appstore_data(db: Database) -> Dict[str, Any]:
-    """Sync data from Apple App Store Connect into MongoDB."""
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    now_dt = datetime.now(timezone.utc)
-
-    # Upsert iOS baseline metrics for AISA and AI Legal
-    synced_records = 0
-    token = generate_appstore_jwt()
-    if token:
-        for proj, app_id in [("AISA", settings.AISA_APPLE_APP_ID), ("AI_LEGAL", settings.AI_LEGAL_APPLE_APP_ID)]:
-            if app_id:
-                try:
-                    data = fetch_appstore_metrics(app_id=app_id)
-                    if data and "data" in data:
-                        # Process real API data
-                        synced_records += 1
-                except Exception as e:
-                    logger.warning(f"Error fetching App Store data for {proj}: {e}")
-
-    return {
-        "success": True,
-        "provider": "app_store_connect",
-        "synced_records": synced_records,
-        "message": f"Successfully synchronized {synced_records} Apple App Store Connect iOS records.",
-        "synced_at": now_dt
-    }
+    """Sync data from Apple App Store Connect daily sales reports into MongoDB."""
+    from src.integrations.app_store.provider import AppleAppStoreProvider
+    
+    logger.info("Triggering automated Apple App Store Connect sales report sync...")
+    try:
+        provider = AppleAppStoreProvider(db)
+        if not provider.is_configured():
+            logger.warning("Apple App Store Connect provider is not fully configured. Skipping background sync.")
+            return {"success": False, "error": "Provider not configured"}
+            
+        # Run daily summary reports sync
+        result = provider.sync_transactions(product_code="all")
+        return {
+            "success": True,
+            "provider": "app_store",
+            "message": f"Successfully executed App Store Connect sales sync: {result}",
+            "synced_at": datetime.now(timezone.utc)
+        }
+    except Exception as e:
+        logger.error(f"Failed to execute automated App Store sync: {e}")
+        return {
+            "success": False,
+            "provider": "app_store",
+            "error": str(e),
+            "synced_at": datetime.now(timezone.utc)
+        }

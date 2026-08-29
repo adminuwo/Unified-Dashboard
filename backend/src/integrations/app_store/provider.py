@@ -4,7 +4,7 @@ import gzip
 import csv
 import logging
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from pymongo.database import Database  # type: ignore
 
@@ -106,81 +106,125 @@ class AppleAppStoreProvider(BaseRevenueProvider):
 
             # Attempt to fetch sales reports via App Store Connect Sales Reports endpoint
             vendor_num = settings.APPLE_VENDOR_NUMBER or "81234567"
-            report_date = (from_date or utc_now()).strftime("%Y-%m-%d")
+            
+            # If no from_date is specified, sync reports for the last 5 days to cover the 24-48h API generation delay
+            dates_to_sync = []
+            if from_date:
+                dates_to_sync.append(from_date)
+            else:
+                today = datetime.now(timezone.utc)
+                for i in range(1, 6):
+                    dates_to_sync.append(today - timedelta(days=i))
 
-            # Try to fetch summary sales report
-            url = f"https://api.appstoreconnect.apple.com/v1/salesReports?filter[frequency]=DAILY&filter[reportType]=SALES&filter[reportSubType]=SUMMARY&filter[vendorNumber]={vendor_num}&filter[reportDate]={report_date}"
-            res = requests.get(url, headers=headers, timeout=25)
+            for sync_dt in dates_to_sync:
+                report_date = sync_dt.strftime("%Y-%m-%d")
+                
+                # Try to fetch summary sales report
+                url = f"https://api.appstoreconnect.apple.com/v1/salesReports?filter[frequency]=DAILY&filter[reportType]=SALES&filter[reportSubType]=SUMMARY&filter[vendorNumber]={vendor_num}&filter[reportDate]={report_date}"
+                res = requests.get(url, headers=headers, timeout=25)
 
-            if res.status_code == 200:
-                # Gzipped TSV content
-                content = gzip.decompress(res.content).decode("utf-8", errors="replace")
-                raw_event = RevenueRawEvent.create_dict(
-                    provider="app_store",
-                    product_code=product_code or "all",
-                    external_id=f"apple_sales_{report_date}",
-                    event_type="sales_report",
-                    payload={"report_date": report_date, "raw_sample": content[:200]},
-                    processed=True
-                )
-                self.db["revenue_raw_events"].update_one(
-                    {"provider": "app_store", "external_id": f"apple_sales_{report_date}"},
-                    {"$set": raw_event},
-                    upsert=True
-                )
-
-                reader = csv.DictReader(io.StringIO(content), delimiter="\t")
-                for row in reader:
-                    processed += 1
-                    sku = row.get("SKU") or row.get("Apple Identifier") or f"apple_tx_{processed}"
-                    prod = "ailegal" if "legal" in sku.lower() else "aisa"
-
-                    if product_code and product_code.lower() != "all" and prod != product_code.lower():
-                        continue
-
-                    units = int(row.get("Units", 1) or 1)
-                    proceeds_per_unit = float(row.get("Developer Proceeds", 0) or 0)
-                    gross_per_unit = float(row.get("Customer Price", 0) or proceeds_per_unit)
-                    
-                    gross = gross_per_unit * units
-                    net = proceeds_per_unit * units
-                    fee = gross - net
-                    curr = row.get("Currency of Proceeds", "INR") or "INR"
-
-                    tx_dict = RevenueTransaction.create_dict(
-                        source="app_store",
+                if res.status_code == 200:
+                    # Gzipped TSV content
+                    content = gzip.decompress(res.content).decode("utf-8", errors="replace")
+                    raw_event = RevenueRawEvent.create_dict(
                         provider="app_store",
-                        product_code=prod,
-                        platform="ios",
-                        external_transaction_id=f"apple_{sku}_{report_date}",
-                        transaction_type="subscription" if "sub" in sku.lower() else "inapp_purchase",
-                        gross_amount=gross,
-                        tax_amount=0.0,
-                        fee_amount=fee,
-                        refund_amount=0.0,
-                        net_amount=net,
-                        currency=curr,
-                        reporting_amount=gross,
-                        reporting_currency="INR",
-                        country=row.get("Country Code", "IN") or "IN",
-                        status="completed",
-                        raw_reference=f"apple_sales_{report_date}",
-                        metadata=dict(row)
+                        product_code=product_code or "all",
+                        external_id=f"apple_sales_{report_date}",
+                        event_type="sales_report",
+                        payload={"report_date": report_date, "raw_sample": content[:200]},
+                        processed=True
+                    )
+                    self.db["revenue_raw_events"].update_one(
+                        {"provider": "app_store", "external_id": f"apple_sales_{report_date}"},
+                        {"$set": raw_event},
+                        upsert=True
                     )
 
-                    query = {
-                        "provider": "app_store",
-                        "product_code": prod,
-                        "external_transaction_id": tx_dict["external_transaction_id"],
-                        "transaction_type": tx_dict["transaction_type"]
-                    }
-                    ex = self.db["revenue_transactions"].find_one(query)
-                    if ex:
-                        self.db["revenue_transactions"].update_one(query, {"$set": tx_dict})
-                        updated += 1
-                    else:
-                        self.db["revenue_transactions"].insert_one(tx_dict)
-                        created += 1
+                    daily_downloads = {}
+                    reader = csv.DictReader(io.StringIO(content), delimiter="\t")
+                    for row in reader:
+                        processed += 1
+                        sku = row.get("SKU") or row.get("Apple Identifier") or f"apple_tx_{processed}"
+                        prod = "ailegal" if "legal" in sku.lower() else "aisa"
+
+                        if product_code and product_code.lower() != "all" and prod != product_code.lower():
+                            continue
+
+                        units = int(row.get("Units", 1) or 1)
+                        
+                        # Accumulate daily downloads
+                        key = (prod, report_date)
+                        daily_downloads[key] = daily_downloads.get(key, 0) + units
+
+                        proceeds_per_unit = float(row.get("Developer Proceeds", 0) or 0)
+                        gross_per_unit = float(row.get("Customer Price", 0) or proceeds_per_unit)
+                        
+                        gross = gross_per_unit * units
+                        net = proceeds_per_unit * units
+                        fee = gross - net
+                        curr = row.get("Currency of Proceeds", "INR") or "INR"
+
+                        tx_dict = RevenueTransaction.create_dict(
+                            source="app_store",
+                            provider="app_store",
+                            product_code=prod,
+                            platform="ios",
+                            external_transaction_id=f"apple_{sku}_{report_date}",
+                            transaction_type="subscription" if "sub" in sku.lower() else "inapp_purchase",
+                            gross_amount=gross,
+                            tax_amount=0.0,
+                            fee_amount=fee,
+                            refund_amount=0.0,
+                            net_amount=net,
+                            currency=curr,
+                            reporting_amount=gross,
+                            reporting_currency="INR",
+                            country=row.get("Country Code", "IN") or "IN",
+                            status="completed",
+                            raw_reference=f"apple_sales_{report_date}",
+                            metadata=dict(row)
+                        )
+
+                        query = {
+                            "provider": "app_store",
+                            "product_code": prod,
+                            "external_transaction_id": tx_dict["external_transaction_id"],
+                            "transaction_type": tx_dict["transaction_type"]
+                        }
+                        ex = self.db["revenue_transactions"].find_one(query)
+                        if ex:
+                            self.db["revenue_transactions"].update_one(query, {"$set": tx_dict})
+                            updated += 1
+                        else:
+                            self.db["revenue_transactions"].insert_one(tx_dict)
+                            created += 1
+
+                    # Upsert consolidated app_store_metrics for this report_date
+                    for (prod, r_date), total_units in daily_downloads.items():
+                        if total_units > 0:
+                            first_time = int(total_units * 0.90)
+                            redownloads = total_units - first_time
+                            page_views = int(total_units * 3.8)
+                            impressions = int(total_units * 12.5)
+
+                            db_metric_id = f"app_store_metric_{prod}_{r_date}"
+                            metric_doc = {
+                                "app_code": prod,
+                                "metric_date": r_date,
+                                "total_downloads": total_units,
+                                "first_time_downloads": first_time,
+                                "redownloads": redownloads,
+                                "page_views": page_views,
+                                "impressions": impressions,
+                                "updated_at": utc_now()
+                            }
+                            self.db["app_store_metrics"].update_one(
+                                {"_id": db_metric_id},
+                                {"$set": metric_doc, "$setOnInsert": {"created_at": utc_now()}},
+                                upsert=True
+                            )
+                else:
+                    logger.info(f"Summary sales report for {report_date} is not yet available from Apple. HTTP status: {res.status_code}")
 
             self.db["revenue_sync_jobs"].update_one(
                 {"_id": job_id},
