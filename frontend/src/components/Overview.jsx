@@ -162,7 +162,11 @@ export const Overview = () => {
             <span>Google Play Installs</span>
             <div className="metric-icon">🤖</div>
           </div>
-          <div className="metric-value">{playAnalytics?.combined?.daily_device_installs || telemetry?.total_downloads || 0}</div>
+          <div className="metric-value">
+            {((playAnalytics?.combined?.total_user_installs_latest > 0
+              ? playAnalytics?.combined?.total_user_installs_latest
+              : playAnalytics?.combined?.daily_device_installs) || telemetry?.total_downloads || 0).toLocaleString()}
+          </div>
           <div className="metric-sub">Android Devices (Google Play)</div>
         </div>
 
