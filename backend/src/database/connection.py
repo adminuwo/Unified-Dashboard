@@ -157,8 +157,93 @@ def init_db(db: Database | None = None):
     except Exception as e:
         print(f"[init_db] Note: Index creation deferred or skipped: {e}")
 
-
-# Seeding of admin users and application keys has been removed per request.
+    # Ensure platform master keys and whitelisted domains exist in application_keys
+    try:
+        import hashlib
+        from datetime import datetime, timezone
+        
+        now = datetime.now(timezone.utc)
+        master_keys = [
+            {
+                "_id": "app_aimall_master",
+                "application_name": "AI Mall (aimall24.com)",
+                "app_code": "aimall",
+                "api_key_hash": hashlib.sha256(b"key_aimall_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["aimall24.com", "www.aimall24.com", "localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_aisa_master",
+                "application_name": "AISA (aisa24.com)",
+                "app_code": "aisa",
+                "api_key_hash": hashlib.sha256(b"key_aisa_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["aisa24.com", "beta.aisa24.com", "www.aisa24.com", "localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_ailegal_master",
+                "application_name": "AI Legal",
+                "app_code": "ailegal",
+                "api_key_hash": hashlib.sha256(b"key_ailegal_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_uwoconnect_master",
+                "application_name": "UWO Connect",
+                "app_code": "uwoconnect",
+                "api_key_hash": hashlib.sha256(b"key_uwoconnect_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["uwo24.com", "admin.uwo24.com", "localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_efv_master",
+                "application_name": "EFV Framework",
+                "app_code": "efvframework",
+                "api_key_hash": hashlib.sha256(b"key_efv_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_yugamc_master",
+                "application_name": "Yuga MC",
+                "app_code": "yugamc",
+                "api_key_hash": hashlib.sha256(b"key_yugamc_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["yugamc.com", "localhost"],
+                "created_at": now,
+                "updated_at": now
+            },
+            {
+                "_id": "app_uwo_master",
+                "application_name": "UWO Central",
+                "app_code": "uwo",
+                "api_key_hash": hashlib.sha256(b"key_uwo_live_master_2026").hexdigest(),
+                "status": "active",
+                "allowed_domains": ["uwo24.com", "admin.uwo24.com", "localhost"],
+                "created_at": now,
+                "updated_at": now
+            }
+        ]
+        
+        for k in master_keys:
+            db["application_keys"].update_one(
+                {"_id": k["_id"]},
+                {"$setOnInsert": k, "$set": {"status": "active", "allowed_domains": k["allowed_domains"], "updated_at": now}},
+                upsert=True
+            )
+    except Exception as e:
+        print(f"[init_db] Note: Master keys registration: {e}")
 
 
 

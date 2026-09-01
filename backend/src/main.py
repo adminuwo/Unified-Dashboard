@@ -79,10 +79,40 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-# Enable CORS Middleware with configurable origins
+# Explicitly whitelisted platform origins including aimall24.com
+DEFAULT_CORS_ORIGINS = [
+    "https://aimall24.com",
+    "https://www.aimall24.com",
+    "http://aimall24.com",
+    "http://www.aimall24.com",
+    "https://aisa24.com",
+    "https://beta.aisa24.com",
+    "https://www.aisa24.com",
+    "http://aisa24.com",
+    "https://uwo24.com",
+    "https://admin.uwo24.com",
+    "https://yugamc.com",
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+
+configured_origins = settings.cors_origins
+if configured_origins != ["*"]:
+    for o in configured_origins:
+        if o not in DEFAULT_CORS_ORIGINS:
+            DEFAULT_CORS_ORIGINS.append(o)
+
+# Enable CORS Middleware with configurable origins & regex for all platform domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=DEFAULT_CORS_ORIGINS,
+    allow_origin_regex=r"https?://(.*\.)?(uwo24\.com|aisa24\.com|aimall24\.com|yugamc\.com|localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
