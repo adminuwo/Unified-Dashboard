@@ -79,8 +79,12 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-# Explicitly whitelisted platform origins including aimall24.com
+# Explicitly whitelisted platform origins including aimall24.com, efvframework.com, etc.
 DEFAULT_CORS_ORIGINS = [
+    "https://efvframework.com",
+    "https://www.efvframework.com",
+    "http://efvframework.com",
+    "http://www.efvframework.com",
     "https://aimall24.com",
     "https://www.aimall24.com",
     "http://aimall24.com",
@@ -92,6 +96,9 @@ DEFAULT_CORS_ORIGINS = [
     "https://uwo24.com",
     "https://admin.uwo24.com",
     "https://yugamc.com",
+    "https://www.yugamc.com",
+    "https://uwoconnect.com",
+    "https://www.uwoconnect.com",
     "http://localhost:5173",
     "http://localhost:8080",
     "http://localhost:3000",
@@ -112,7 +119,7 @@ if configured_origins != ["*"]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=DEFAULT_CORS_ORIGINS,
-    allow_origin_regex=r"https?://(.*\.)?(uwo24\.com|aisa24\.com|aimall24\.com|yugamc\.com|localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"https?://(.*\.)?(uwo24\.com|aisa24\.com|aimall24\.com|efvframework\.com|yugamc\.com|uwoconnect\.com|localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
