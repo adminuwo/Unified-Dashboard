@@ -51,6 +51,9 @@ def get_current_admin(credentials: Optional[HTTPAuthorizationCredentials] = Depe
         )
 
 
+verify_admin_token = get_current_admin
+
+
 @router.post("/login", response_model=AdminLoginResponse)
 def admin_login(
     req: AdminLoginRequest,

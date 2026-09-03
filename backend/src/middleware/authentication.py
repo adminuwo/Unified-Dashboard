@@ -1,6 +1,7 @@
 import hashlib
 from typing import Optional
 from fastapi import Header, HTTPException, status, Depends  # type: ignore
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials  # type: ignore
 from pymongo.database import Database  # type: ignore
 from jose import JWTError, jwt  # type: ignore
 
@@ -117,3 +118,37 @@ def get_current_user_and_application(
 ) -> AppAndUserAuth:
     """Validate both Application API Key and User JWT."""
     return AppAndUserAuth(application=app, user=user)
+
+
+admin_bearer_security = HTTPBearer(auto_error=False)
+
+
+def get_current_admin(credentials: Optional[HTTPAuthorizationCredentials] = Depends(admin_bearer_security)) -> str:
+    """Validate Admin Bearer JWT Token."""
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication required. Missing or invalid Authorization header.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        username: Optional[str] = payload.get("sub")
+        role: Optional[str] = payload.get("role")
+        is_admin_role = role and ("admin" in role.lower())
+        if not username or not is_admin_role:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid admin token credentials."
+            )
+        return username
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Expired or invalid admin token."
+        )
+
+
+verify_admin_token = get_current_admin

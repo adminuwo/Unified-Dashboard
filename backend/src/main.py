@@ -20,6 +20,7 @@ from src.telemetry.router import router as telemetry_router
 from src.analytics.router import router as analytics_router
 from src.unified_analytics.router import router as unified_analytics_router
 from src.modules.revenue.router import router as revenue_router, public_revenue_router
+from src.marketing.router import router as marketing_router, redirect_router
 from src.unified_analytics.scheduler import (
     start_unified_analytics_scheduler,
     shutdown_unified_analytics_scheduler
@@ -137,6 +138,8 @@ app.include_router(analytics_router)
 app.include_router(unified_analytics_router, prefix="/api")
 app.include_router(revenue_router, prefix="/api")
 app.include_router(public_revenue_router, prefix="/api")
+app.include_router(marketing_router)
+app.include_router(redirect_router)
 
 
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse  # type: ignore

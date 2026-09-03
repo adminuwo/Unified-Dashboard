@@ -14,6 +14,7 @@ import { ChatTrackingTab } from './components/ChatTrackingTab';
 import { AppDownloadsTab } from './components/AppDownloadsTab';
 import { UnifiedAnalytics } from './components/UnifiedAnalytics';
 import { AuthTokenTester } from './components/AuthTokenTester';
+import { MarketingCampaignsTab } from './components/MarketingCampaignsTab';
 
 export function App() {
   const { token } = useAuth();
@@ -26,6 +27,7 @@ export function App() {
   const tabTitles = {
     unified_analytics: { title: 'Unified Analytics & Intelligence', subtitle: 'Centralized Multi-Platform Telemetry: GA4 Web, Google Play & GCP Monitoring' },
     overview: { title: 'Dashboard Overview', subtitle: 'Centralized platform analytics and activity monitoring' },
+    marketing: { title: 'Marketing Campaigns & Referral Tracking', subtitle: 'Multi-platform UTM link generator, short URLs, QR codes & post reach telemetry across all products' },
     overlap: { title: 'Cross-App Analytics', subtitle: 'Analyze joint user downloads and engagement overlap between apps' },
     auth_tester: { title: 'Unified Auth Service Tester', subtitle: 'Test Central Registration, Login, Token Refresh Rotation & Token Validation' },
     applications: { title: 'Application API Keys', subtitle: 'Manage API credentials for connected standalone applications' },
@@ -52,6 +54,7 @@ export function App() {
         <main className="main-content">
           {currentTab === 'unified_analytics' && <UnifiedAnalytics />}
           {currentTab === 'overview' && <Overview />}
+          {currentTab === 'marketing' && <MarketingCampaignsTab />}
           {currentTab === 'overlap' && <OverlapAnalytics />}
           {currentTab === 'auth_tester' && <AuthTokenTester />}
           {currentTab === 'applications' && <ApplicationKeys />}
