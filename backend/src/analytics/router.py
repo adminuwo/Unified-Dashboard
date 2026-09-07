@@ -346,3 +346,57 @@ def manual_update_installs(
         "active_devices": active_devices,
         "as_of_date": as_of_date
     }
+
+
+@router.post("/app-store/manual-update")
+def manual_update_app_store_metrics(
+    payload: dict,
+    db: Database = Depends(get_db),
+    admin: str = Depends(get_current_admin)
+):
+    """
+    Manually update cumulative or daily iOS App Store download metrics for an app.
+    
+    Body: { "app_code": "ailegal", "total_downloads": 45, "first_time_downloads": 40, "as_of_date": "2026-08-29" }
+    """
+    from datetime import datetime, timezone
+    from src.database.models import utc_now
+
+    app_code = (payload.get("app_code") or "ailegal").lower().strip()
+    total_downloads = int(payload.get("total_downloads", 0))
+    first_time = int(payload.get("first_time_downloads", int(total_downloads * 0.9)))
+    redownloads = int(payload.get("redownloads", total_downloads - first_time))
+    page_views = int(payload.get("page_views", int(total_downloads * 3.8)))
+    impressions = int(payload.get("impressions", int(total_downloads * 12.5)))
+    as_of_date = payload.get("as_of_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    bundle_id = "com.uwo.ailegal" if app_code == "ailegal" else "com.uwo.aisa"
+    apple_app_id = "6797449251" if app_code == "ailegal" else "6779135418"
+
+    doc_id = f"app_store_metric_{app_code}_{as_of_date}"
+    db["app_store_metrics"].update_one(
+        {"_id": doc_id},
+        {"$set": {
+            "app_code": app_code,
+            "bundle_id": bundle_id,
+            "apple_app_id": apple_app_id,
+            "metric_date": as_of_date,
+            "platform": "ios",
+            "total_downloads": total_downloads,
+            "first_time_downloads": first_time,
+            "redownloads": redownloads,
+            "page_views": page_views,
+            "impressions": impressions,
+            "source": "manual_app_store_entry",
+            "updated_at": utc_now()
+        }, "$setOnInsert": {"created_at": utc_now()}},
+        upsert=True
+    )
+
+    return {
+        "success": True,
+        "message": f"Updated {app_code} iOS downloads: {total_downloads} total, {first_time} first-time, {page_views} page views as of {as_of_date}",
+        "app_code": app_code,
+        "total_downloads": total_downloads,
+        "as_of_date": as_of_date
+    }

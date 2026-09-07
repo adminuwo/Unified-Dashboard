@@ -175,11 +175,18 @@ class RazorpayProvider(BaseRevenueProvider):
                         status_raw = pay.get("status", "captured").lower()
                         status_norm = "completed" if status_raw in ["captured", "paid"] else status_raw
 
+                        notes_dict = pay.get("notes") or {}
+                        platform_inferred = "web"
+                        if isinstance(notes_dict, dict):
+                            p_val = (notes_dict.get("platform") or notes_dict.get("client_platform") or "").lower().strip()
+                            if p_val in ["android", "ios", "web"]:
+                                platform_inferred = p_val
+
                         tx_dict = RevenueTransaction.create_dict(
                             source="razorpay",
                             provider="razorpay",
                             product_code=prod_code,
-                            platform="web",
+                            platform=platform_inferred,
                             external_transaction_id=pay_id,
                             external_order_id=pay.get("order_id"),
                             transaction_type="payment",
@@ -216,6 +223,8 @@ class RazorpayProvider(BaseRevenueProvider):
                         }
                         existing = self.db["revenue_transactions"].find_one(query)
                         if existing:
+                            if existing.get("platform") and existing.get("platform") != "web":
+                                tx_dict["platform"] = existing.get("platform")
                             update_dict = {k: v for k, v in tx_dict.items() if k != "_id"}
                             self.db["revenue_transactions"].update_one(query, {"$set": update_dict})
                             updated += 1

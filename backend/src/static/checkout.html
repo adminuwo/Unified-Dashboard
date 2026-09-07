@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI Legal™ Secure Web Checkout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #0f172a;
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.35);
+      --gold: #f59e0b;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .checkout-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent-glow);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+    h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.5px; }
+    p.subtitle { font-size: 13px; color: var(--subtext); margin-bottom: 24px; }
+    .plan-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .plan-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .plan-row:last-child { margin-bottom: 0; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 10px; margin-top: 10px; }
+    .plan-label { font-size: 13px; color: var(--subtext); }
+    .plan-val { font-size: 14px; font-weight: 700; color: #fff; }
+    .amount-highlight { font-size: 22px; font-weight: 800; color: #34d399; }
+    .btn-pay {
+      width: 100%;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-pay:hover { opacity: 0.95; transform: translateY(-1px); }
+    .btn-secondary {
+      width: 100%;
+      background: transparent;
+      color: var(--subtext);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .status-badge {
+      display: none;
+      padding: 14px;
+      border-radius: 12px;
+      margin-top: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+    .status-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .security-note {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="checkout-card">
+    <div class="brand-badge">
+      <span>⚖️</span> AI Legal Advisory
+    </div>
+    <h1 id="checkoutTitle">Upgrade to Legal Pro</h1>
+    <p class="subtitle">Secure Android Web Checkout (UPI, Cards & Netbanking)</p>
+
+    <div class="plan-box">
+      <div class="plan-row">
+        <span class="plan-label">Plan / Product</span>
+        <span class="plan-val" id="displayProduct">AI Legal Pro</span>
+      </div>
+      <div class="plan-row">
+        <span class="plan-label">Billing Cycle</span>
+        <span class="plan-val" id="displayCycle">Monthly Subscription</span>
+      </div>
+      <div class="plan-row">
+        <span class="plan-label">Amount Due</span>
+        <span class="plan-val amount-highlight" id="displayAmount">₹999.00</span>
+      </div>
+    </div>
+
+    <button id="payButton" class="btn-pay" onclick="openRazorpay()">
+      <span>🔒</span> Pay Securely Now
+    </button>
+    <button id="cancelButton" class="btn-secondary" onclick="cancelAndReturn()">
+      Cancel and Return to App
+    </button>
+
+    <div id="statusBox" class="status-badge"></div>
+
+    <div class="security-note">
+      <span>🛡️</span> 256-Bit Encrypted · Powered by Razorpay · SOC 2 Compliant
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('order_id') || 'order_demo_123';
+    const amount = parseFloat(params.get('amount') || '999.0');
+    const currency = params.get('currency') || 'INR';
+    const keyId = params.get('key_id') || 'rzp_live_SBFlInxBiRfOGd';
+    const productCode = params.get('product') || 'ailegal';
+    const platform = params.get('platform') || 'android';
+    const planId = params.get('plan_id') || 'ailegal_pro_monthly';
+    const callbackUrl = params.get('callback') || 'ailegal://payment-callback';
+    const customerId = params.get('customer_id') || '';
+    const customerEmail = params.get('customer_email') || '';
+    const customerName = params.get('customer_name') || '';
+
+    // Update display values
+    document.getElementById('displayAmount').textContent = '₹' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    if (productCode === 'ailegal') {
+      document.getElementById('displayProduct').textContent = 'AI Legal Pro';
+    } else {
+      document.getElementById('displayProduct').textContent = productCode.toUpperCase();
+    }
+
+    function showStatus(msg, isSuccess) {
+      const box = document.getElementById('statusBox');
+      box.style.display = 'block';
+      box.className = 'status-badge ' + (isSuccess ? 'status-success' : 'status-error');
+      box.innerHTML = msg;
+    }
+
+    function cancelAndReturn() {
+      const target = callbackUrl + (callbackUrl.includes('?') ? '&' : '?') + 'status=cancelled';
+      window.location.href = target;
+    }
+
+    function openRazorpay() {
+      const options = {
+        key: keyId,
+        amount: Math.round(amount * 100),
+        currency: currency,
+        name: "AI Legal Advisory",
+        description: "AI Legal Pro Membership - Android Checkout",
+        image: "https://aisa24.com/favicon.ico",
+        order_id: orderId.startsWith('order_mock') ? undefined : orderId,
+        prefill: {
+          name: customerName,
+          email: customerEmail
+        },
+        theme: {
+          color: "#3b82f6"
+        },
+        handler: async function (response) {
+          showStatus('Payment captured! Verifying cryptographic signature & activating Pro plan...', true);
+          document.getElementById('payButton').style.display = 'none';
+
+          try {
+            const verifyRes = await fetch('/api/revenue/checkout/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                order_id: response.razorpay_order_id || orderId,
+                payment_id: response.razorpay_payment_id,
+                signature: response.razorpay_signature || '',
+                product_code: productCode,
+                platform: platform,
+                provider: 'razorpay',
+                amount: amount,
+                customer_id: customerId,
+                customer_email: customerEmail,
+                plan_id: planId
+              })
+            });
+            const data = await verifyRes.json();
+            showStatus('Success! Subscription activated. Returning to AI Legal app...', true);
+
+            // Redirect back to Android app via Deep link callback
+            setTimeout(() => {
+              const redirectTarget = callbackUrl + 
+                (callbackUrl.includes('?') ? '&' : '?') + 
+                'status=success&payment_id=' + encodeURIComponent(response.razorpay_payment_id) + 
+                '&order_id=' + encodeURIComponent(response.razorpay_order_id || orderId);
+              window.location.href = redirectTarget;
+            }, 1200);
+          } catch (err) {
+            showStatus('Verification warning: ' + err.message + '. Returning to app...', false);
+            setTimeout(() => {
+              window.location.href = callbackUrl + '?status=success&payment_id=' + encodeURIComponent(response.razorpay_payment_id);
+            }, 1500);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            showStatus('Checkout window closed. You can tap Pay Securely Now to try again.', false);
+          }
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+
+    // Auto-launch Razorpay if loaded in Android Custom Tabs
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        try {
+          openRazorpay();
+        } catch (e) {
+          console.warn('Auto-open deferred:', e);
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>

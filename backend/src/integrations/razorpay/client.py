@@ -92,6 +92,18 @@ class RazorpayClient:
         params: Dict[str, Any] = {"count": count, "skip": skip}
         return self._request("GET", "/invoices", params=params)
 
+    def create_order(self, amount: int, currency: str = "INR", receipt: Optional[str] = None, notes: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create a new payment order for web and mobile checkout."""
+        payload: Dict[str, Any] = {
+            "amount": int(amount),
+            "currency": currency.upper()
+        }
+        if receipt:
+            payload["receipt"] = receipt
+        if notes:
+            payload["notes"] = notes
+        return self._request("POST", "/orders", json_data=payload)
+
     def verify_webhook_signature(self, body_bytes: bytes, signature: str) -> bool:
         """Verify HMAC-SHA256 signature for incoming webhooks."""
         if not self.webhook_secret or not signature:

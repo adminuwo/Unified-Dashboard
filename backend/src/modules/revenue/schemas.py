@@ -196,3 +196,99 @@ class PaymentEventIngestResponse(BaseModel):
     updated: bool
     recorded_at: datetime
 
+
+class CheckoutSessionCreateRequest(BaseModel):
+    product_code: str = Field("ailegal", description="Canonical product code (e.g. ailegal, aisa)")
+    platform: str = Field("android", description="Platform: android or web")
+    plan_id: str = Field("ailegal_pro_monthly", description="Plan ID to subscribe to")
+    amount: float = Field(999.0, gt=0, description="Gross amount in INR")
+    currency: str = Field("INR", description="Currency code")
+    customer_id: Optional[str] = Field(None, description="User ID")
+    customer_email: Optional[str] = Field(None, description="User email")
+    customer_name: Optional[str] = Field(None, description="User full name")
+    callback_url: Optional[str] = Field(None, description="Deep link or web callback URL")
+
+
+class CheckoutSessionResponse(BaseModel):
+    success: bool
+    order_id: str
+    amount: float
+    currency: str
+    key_id: str
+    product_code: str
+    platform: str
+    plan_id: str
+    checkout_url: str
+    callback_url: str
+    prefill: Optional[Dict[str, str]] = None
+
+
+class CheckoutVerifyRequest(BaseModel):
+    order_id: str
+    payment_id: str
+    signature: Optional[str] = ""
+    product_code: str = "ailegal"
+    platform: str = "android"
+    provider: str = "razorpay"
+    plan_id: Optional[str] = "ailegal_pro_monthly"
+    amount: Optional[float] = 999.0
+    customer_id: Optional[str] = None
+    customer_email: Optional[str] = None
+
+
+class CheckoutVerifyResponse(BaseModel):
+    success: bool
+    signature_valid: bool
+    product_code: str
+    platform: str
+    order_id: str
+    payment_id: str
+    status: str
+    plan_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    message: str
+
+
+class AppleVerifyRequest(BaseModel):
+    product_code: str = Field("ailegal", description="Canonical product code: ailegal, aisa")
+    transaction_id: str = Field(..., description="StoreKit 2 transactionId or originalTransactionId")
+    signed_payload: Optional[str] = Field(None, description="StoreKit 2 signed JWS payload (verification.jwsRepresentation)")
+    bundle_id: Optional[str] = Field(None, description="App bundle ID (e.g. com.uwo.ailegal)")
+    customer_id: Optional[str] = Field(None, description="User ID")
+    customer_email: Optional[str] = Field(None, description="User email")
+    plan_id: Optional[str] = Field(None, description="StoreKit product ID (e.g. com.uwo.ailegal.pro.monthly)")
+    amount: Optional[float] = Field(None, description="Transaction amount if known")
+    is_sandbox: bool = Field(False, description="Whether this is an Apple Sandbox transaction")
+
+
+class AppleVerifyResponse(BaseModel):
+    success: bool
+    product_code: str
+    bundle_id: str
+    product_id: str
+    transaction_id: str
+    original_transaction_id: str
+    purchase_date: Optional[datetime] = None
+    expires_date: Optional[datetime] = None
+    is_active: bool
+    environment: str
+    message: str
+
+
+class AppleNotificationWebhookRequest(BaseModel):
+    signedPayload: str = Field(..., description="Signed JWS payload from App Store Server Notifications V2")
+
+
+class SubscriptionStatusResponse(BaseModel):
+    is_active: bool
+    product_code: str
+    plan_id: Optional[str] = None
+    plan_name: Optional[str] = None
+    platform_source: Optional[str] = None  # android, ios, web
+    provider: Optional[str] = None         # razorpay, app_store, cashfree
+    credits_remaining: int = 5
+    expires_at: Optional[datetime] = None
+    auto_renew: bool = False
+    original_transaction_id: Optional[str] = None
+    message: str
+

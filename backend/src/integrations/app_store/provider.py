@@ -145,7 +145,12 @@ class AppleAppStoreProvider(BaseRevenueProvider):
                     for row in reader:
                         processed += 1
                         sku = row.get("SKU") or row.get("Apple Identifier") or f"apple_tx_{processed}"
-                        prod = "ailegal" if "legal" in sku.lower() else "aisa"
+                        apple_id = str(row.get("Apple Identifier") or "").strip()
+                        title = str(row.get("Title") or "").lower()
+                        if "legal" in sku.lower() or "legal" in title or apple_id == "6797449251":
+                            prod = "ailegal"
+                        else:
+                            prod = "aisa"
 
                         if product_code and product_code.lower() != "all" and prod != product_code.lower():
                             continue

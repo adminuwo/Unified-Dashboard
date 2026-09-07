@@ -1,12 +1,16 @@
+import os
 from typing import List, Optional, Any
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request  # type: ignore
+from fastapi.responses import FileResponse  # type: ignore
 from pymongo.database import Database  # type: ignore
 
 from src.database.connection import get_db
 from src.admin.router import get_current_admin
 from src.middleware.authentication import validate_optional_app_key
 from src.modules.revenue.service import RevenueService
+from src.integrations.app_store.iap_service import AppleIAPService
+from src.modules.revenue.checkout_service import RevenueCheckoutService
 from src.modules.revenue.schemas import (
     RevenueOverviewResponse,
     ProductsRevenueResponse,
@@ -20,7 +24,15 @@ from src.modules.revenue.schemas import (
     SyncNowRequest,
     SyncNowResponse,
     PaymentEventIngestRequest,
-    PaymentEventIngestResponse
+    PaymentEventIngestResponse,
+    CheckoutSessionCreateRequest,
+    CheckoutSessionResponse,
+    CheckoutVerifyRequest,
+    CheckoutVerifyResponse,
+    AppleVerifyRequest,
+    AppleVerifyResponse,
+    AppleNotificationWebhookRequest,
+    SubscriptionStatusResponse
 )
 
 router = APIRouter(prefix="/admin/revenue", tags=["Revenue Intelligence"])
@@ -38,6 +50,134 @@ def ingest_payment(
     service = RevenueService(db)
     result = service.ingest_payment_event(req)
     return result
+
+
+# ============================================================================
+# 📱 ANDROID WEB PAYMENT FLOW (VIA WEB APPLICATION CHECKOUT)
+# ============================================================================
+
+@public_revenue_router.post("/checkout/session", response_model=CheckoutSessionResponse, status_code=status.HTTP_200_OK)
+def create_web_checkout_session(
+    req: CheckoutSessionCreateRequest,
+    db: Database = Depends(get_db)
+):
+    """
+    Create a Web Checkout Session for Android (or Web) applications.
+    Returns a Razorpay Order ID and checkout URL to be loaded in Android Custom Tabs.
+    """
+    checkout_service = RevenueCheckoutService(db)
+    result = checkout_service.create_checkout_session(
+        product_code=req.product_code,
+        platform=req.platform,
+        plan_id=req.plan_id,
+        amount=req.amount,
+        currency=req.currency,
+        customer_id=req.customer_id,
+        customer_email=req.customer_email,
+        customer_name=req.customer_name,
+        callback_url=req.callback_url
+    )
+    return result
+
+
+@public_revenue_router.get("/checkout/pay")
+def serve_web_checkout_page():
+    """
+    Serve the responsive Web Checkout page designed to be opened by Android Custom Tabs.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    html_path = os.path.join(base_dir, "static", "checkout.html")
+    if not os.path.exists(html_path):
+        raise HTTPException(status_code=404, detail="Checkout interface file not found")
+    return FileResponse(html_path, media_type="text/html")
+
+
+@public_revenue_router.post("/checkout/verify", response_model=CheckoutVerifyResponse, status_code=status.HTTP_200_OK)
+def verify_web_checkout_payment(
+    req: CheckoutVerifyRequest,
+    db: Database = Depends(get_db)
+):
+    """
+    Verify payment signature from Android Web checkout, activate subscription,
+    and ingest transaction with platform='android'.
+    """
+    checkout_service = RevenueCheckoutService(db)
+    result = checkout_service.verify_checkout_payment(
+        order_id=req.order_id,
+        payment_id=req.payment_id,
+        signature=req.signature or "",
+        product_code=req.product_code,
+        platform=req.platform,
+        provider=req.provider,
+        plan_id=req.plan_id,
+        amount=req.amount,
+        customer_id=req.customer_id,
+        customer_email=req.customer_email
+    )
+    return result
+
+
+# ============================================================================
+# 🍎 IOS IN-APP PURCHASE FLOW (STOREKIT 2 & APPLE APP STORE SERVER API)
+# ============================================================================
+
+@public_revenue_router.post("/apple/verify", response_model=AppleVerifyResponse, status_code=status.HTTP_200_OK)
+def verify_apple_in_app_purchase(
+    req: AppleVerifyRequest,
+    db: Database = Depends(get_db)
+):
+    """
+    Verify iOS StoreKit 2 In-App Purchase with Apple App Store Server API (using ES256 key),
+    activate user entitlement, and ingest transaction with platform='ios' and provider='app_store'.
+    """
+    iap_service = AppleIAPService(db)
+    result = iap_service.verify_and_ingest_purchase(
+        transaction_id=req.transaction_id,
+        product_code=req.product_code,
+        signed_payload=req.signed_payload,
+        bundle_id=req.bundle_id,
+        customer_id=req.customer_id,
+        customer_email=req.customer_email,
+        plan_id=req.plan_id,
+        amount=req.amount,
+        is_sandbox=req.is_sandbox
+    )
+    return result
+
+
+@public_revenue_router.post("/apple/webhook", status_code=status.HTTP_200_OK)
+def handle_apple_server_notification(
+    req: AppleNotificationWebhookRequest,
+    db: Database = Depends(get_db)
+):
+    """
+    Handle Apple App Store Server Notifications V2 (ASSNv2) webhook.
+    Processes renewals, expirations, and refunds in real time.
+    """
+    iap_service = AppleIAPService(db)
+    result = iap_service.handle_server_notification_v2(req.signedPayload)
+    return result
+
+
+# ============================================================================
+# 🔄 UNIFIED CROSS-PLATFORM ENTITLEMENT STATUS
+# ============================================================================
+
+@public_revenue_router.get("/subscription/status", response_model=SubscriptionStatusResponse)
+def get_unified_subscription_status(
+    customer_id: str = Query(..., description="User ID or email"),
+    product_code: str = Query("ailegal", description="Product code: ailegal, aisa"),
+    db: Database = Depends(get_db)
+):
+    """
+    Check active subscription entitlements across all platforms.
+    Ensures advocates who subscribe on iOS can access on Android, and vice-versa.
+    """
+    checkout_service = RevenueCheckoutService(db)
+    return checkout_service.get_unified_subscription_status(
+        customer_id_or_email=customer_id,
+        product_code=product_code
+    )
 
 
 
