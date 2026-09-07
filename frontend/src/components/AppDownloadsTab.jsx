@@ -75,6 +75,16 @@ export const AppDownloadsTab = () => {
     }
   };
 
+  const handleManualSyncAndRefresh = async () => {
+    setLoading(true);
+    try {
+      await authFetch('/api/admin/unified-analytics/sync?provider=all', { method: 'POST' });
+    } catch (e) {
+      console.warn('Sync trigger error (proceeding with fetch):', e);
+    }
+    await fetchAnalytics(false);
+  };
+
   // Auto-refresh every 5 minutes
   useEffect(() => {
     fetchAnalytics();
@@ -223,7 +233,7 @@ export const AppDownloadsTab = () => {
             Auto-refresh in <strong style={{ color: '#94a3b8' }}>{Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, '0')}</strong>
           </span>
           <button
-            onClick={() => fetchAnalytics(false)}
+            onClick={handleManualSyncAndRefresh}
             disabled={loading}
             style={{
               background: loading ? '#1e293b' : 'rgba(16, 185, 129, 0.15)',
@@ -233,7 +243,7 @@ export const AppDownloadsTab = () => {
               fontSize: '11px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer'
             }}
           >
-            {loading ? '⟳ Refreshing...' : '⟳ Refresh Now'}
+            {loading ? '⟳ Syncing...' : '⟳ Refresh Now'}
           </button>
         </div>
       </div>
