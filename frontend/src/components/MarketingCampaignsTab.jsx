@@ -1178,6 +1178,50 @@ export const MarketingCampaignsTab = () => {
                     >
                       🤖 AISA Play Store
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('ailegal');
+                        setCustomTargetUrl('https://apps.apple.com/app/id6797449251');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: customTargetUrl.includes('id6797449251') ? 'rgba(59,130,246,0.2)' : '#1E293B',
+                        border: `1px solid ${customTargetUrl.includes('id6797449251') ? '#3B82F6' : '#334155'}`,
+                        color: customTargetUrl.includes('id6797449251') ? '#60A5FA' : '#CBD5E1',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      🍏 AI Legal App Store
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('aisa');
+                        setCustomTargetUrl('https://apps.apple.com/app/id6779135418');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: customTargetUrl.includes('id6779135418') ? 'rgba(59,130,246,0.2)' : '#1E293B',
+                        border: `1px solid ${customTargetUrl.includes('id6779135418') ? '#3B82F6' : '#334155'}`,
+                        color: customTargetUrl.includes('id6779135418') ? '#60A5FA' : '#CBD5E1',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      🍏 AISA App Store
+                    </button>
                     {customTargetUrl ? (
                       <button
                         type="button"

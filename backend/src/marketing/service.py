@@ -1,7 +1,7 @@
 import re
 import uuid
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 
@@ -339,6 +339,7 @@ class MarketingService:
             "campaign_name": link.get("campaign_name"),
             "post_name": link.get("post_name"),
             "timestamp": now,
+            "client_ip": ip,
             "ip_hash": ip_hash,
             "user_agent": user_agent[:250] if user_agent else None,
             "device_type": ua_parsed["device"],
@@ -387,19 +388,55 @@ class MarketingService:
         version: Optional[str] = None,
         ip: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Records verified app install telemetry from mobile app install referrer."""
+        """Records verified app install telemetry from mobile app install referrer or iOS IP matching."""
         db = _get_db()
         now = datetime.now(timezone.utc)
+        attribution_method = "direct" if slug else ("referrer_param" if install_referrer else "none")
 
-        # If slug wasn't provided directly, extract from raw install_referrer string
+        # 1. If slug wasn't provided directly, extract from raw install_referrer string (Android Play Store)
         if not slug and install_referrer:
             match = re.search(r'(?:slug|ref_id|ref)=([a-zA-Z0-9_\-]+)', install_referrer)
             if match:
                 slug = match.group(1)
+                attribution_method = "install_referrer"
 
         link = None
         if slug:
             link = db.marketing_links.find_one({"slug": slug})
+
+        # 2. Probabilistic Attribution (iOS / IP-Match): If slug is not yet found, match by client IP
+        if not link and ip:
+            clean_ip = ip.strip()
+            ip_hash = hashlib.sha256(clean_ip.encode()).hexdigest()[:16]
+            time_window = now - timedelta(hours=72)
+
+            click_query: Dict[str, Any] = {
+                "$or": [
+                    {"client_ip": clean_ip},
+                    {"ip_hash": ip_hash}
+                ],
+                "timestamp": {"$gte": time_window}
+            }
+
+            if product_id and product_id != "unknown":
+                norm_pid = product_id.lower().replace("-", "").replace("_", "")
+                patterns = [product_id, norm_pid]
+                if norm_pid in ["ailegal", "ai-legal", "legal"]:
+                    patterns.extend(["ailegal", "ai-legal"])
+                elif norm_pid in ["aisa"]:
+                    patterns.extend(["aisa"])
+                click_query["product_id"] = {"$in": list(set(patterns))}
+
+            recent_click = db.marketing_clicks.find_one(
+                click_query,
+                sort=[("timestamp", -1)]
+            )
+
+            if recent_click and recent_click.get("slug"):
+                slug = recent_click["slug"]
+                link = db.marketing_links.find_one({"slug": slug})
+                if link:
+                    attribution_method = "ip_match"
 
         dev_key = device_id or ip or str(uuid.uuid4())
         install_doc = {
@@ -412,6 +449,8 @@ class MarketingService:
             "version": version or "1.0.0",
             "ip": ip,
             "timestamp": now,
+            "attributed": bool(link),
+            "attribution_method": attribution_method,
         }
         db.marketing_installs.insert_one(install_doc)
 
@@ -433,6 +472,7 @@ class MarketingService:
             "success": True,
             "slug": slug,
             "attributed": bool(link),
+            "attribution_method": attribution_method,
             "product_id": link.get("product_id") if link else product_id
         }
 
