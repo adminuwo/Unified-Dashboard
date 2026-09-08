@@ -12,6 +12,8 @@ class AuthRepository:
         self.users_col = db["users"]
         self.sessions_col = db["sessions"]
         self.applications_col = db["applications"]
+        self.password_resets_col = db["password_resets"]
+
 
     # ------------------ USERS COLLECTION ------------------
 
@@ -57,7 +59,51 @@ class AuthRepository:
             update_doc
         )
 
+    def update_user_password(self, user_id: str, new_password_hash: str) -> None:
+        now = datetime.now(timezone.utc)
+        self.users_col.update_one(
+            {"_id": user_id},
+            {"$set": {"password_hash": new_password_hash, "updated_at": now}}
+        )
+
+    # ------------------ PASSWORD RESETS COLLECTION ------------------
+
+    def save_password_reset(self, email: str, otp_hash: str, expires_at: datetime) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        clean_email = email.strip().lower()
+        # Invalidate previous unused reset tokens for this email
+        self.password_resets_col.update_many(
+            {"email": clean_email, "is_used": False},
+            {"$set": {"is_used": True, "updated_at": now}}
+        )
+
+        reset_doc = {
+            "_id": str(uuid.uuid4()),
+            "email": clean_email,
+            "otp_hash": otp_hash,
+            "expires_at": expires_at,
+            "is_used": False,
+            "created_at": now,
+        }
+        self.password_resets_col.insert_one(reset_doc)
+        return reset_doc
+
+    def get_active_password_reset(self, email: str) -> Optional[Dict[str, Any]]:
+        clean_email = email.strip().lower()
+        return self.password_resets_col.find_one(
+            {"email": clean_email, "is_used": False},
+            sort=[("created_at", -1)]
+        )
+
+    def mark_password_reset_used(self, reset_id: str) -> None:
+        now = datetime.now(timezone.utc)
+        self.password_resets_col.update_one(
+            {"_id": reset_id},
+            {"$set": {"is_used": True, "updated_at": now}}
+        )
+
     # ------------------ SESSIONS COLLECTION ------------------
+
 
     def create_session(
         self,

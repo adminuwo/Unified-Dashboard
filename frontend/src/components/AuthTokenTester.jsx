@@ -16,7 +16,16 @@ export const AuthTokenTester = () => {
   const [testToken, setTestToken] = useState('');
   const [meResult, setMeResult] = useState(null);
   const [validateResult, setValidateResult] = useState(null);
+
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotResult, setForgotResult] = useState(null);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetResult, setResetResult] = useState(null);
+
   const [loadingAction, setLoadingAction] = useState('');
+
 
   const API_BASE = '/api';
 
@@ -138,7 +147,62 @@ export const AuthTokenTester = () => {
     }
   };
 
+  // Handle Forgot Password (request OTP)
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoadingAction('forgot');
+    setForgotResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      const data = await res.json();
+      setForgotResult({ status: res.status, data });
+      if (res.ok) {
+        setResetEmail(forgotEmail.trim());
+        if (data.otp_preview) {
+          setResetOtp(data.otp_preview);
+        }
+      }
+    } catch (err) {
+      setForgotResult({ status: 500, data: { error: err.message } });
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
+  // Handle Reset Password (submit OTP & new password)
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setLoadingAction('reset_pwd');
+    setResetResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetEmail.trim(),
+          otp: resetOtp.trim(),
+          new_password: resetNewPassword,
+        }),
+      });
+      const data = await res.json();
+      setResetResult({ status: res.status, data });
+      if (res.ok) {
+        setLoginEmail(resetEmail.trim());
+        setLoginPassword(resetNewPassword);
+      }
+    } catch (err) {
+      setResetResult({ status: 500, data: { error: err.message } });
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
   return (
+
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', color: '#f8fafc' }}>
         <h2 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#38bdf8' }}>
@@ -244,7 +308,76 @@ export const AuthTokenTester = () => {
             </pre>
           )}
         </div>
+
+        {/* 4. Forgot & Reset Password Flow */}
+        <div style={{ background: '#0f172a', border: '1px solid #d4af37', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ color: '#fbbf24', fontSize: '16px', marginTop: 0 }}>🔑 4. Forgot & Reset Password Flow</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Step A: Request OTP */}
+            <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Step A: Request OTP</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="email"
+                  placeholder="Registered Email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button type="submit" disabled={loadingAction === 'forgot'} style={{ ...btnStyle, background: '#d97706', whiteSpace: 'nowrap' }}>
+                  {loadingAction === 'forgot' ? 'Sending...' : 'Send OTP'}
+                </button>
+              </div>
+            </form>
+            {forgotResult && (
+              <pre style={{ ...codeBlockStyle, maxHeight: '80px', margin: 0 }}>
+                Status: {forgotResult.status}{'\n'}
+                {JSON.stringify(forgotResult.data, null, 2)}
+              </pre>
+            )}
+
+            {/* Step B: Reset Password */}
+            <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed #334155', paddingTop: '12px' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Step B: Submit OTP & Set New Password</span>
+              <input
+                type="email"
+                placeholder="Target Email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+                style={inputStyle}
+              />
+              <input
+                type="text"
+                placeholder="6-digit OTP Code"
+                value={resetOtp}
+                onChange={(e) => setResetOtp(e.target.value)}
+                required
+                style={inputStyle}
+              />
+              <input
+                type="password"
+                placeholder="New Password (min 6 chars)"
+                value={resetNewPassword}
+                onChange={(e) => setResetNewPassword(e.target.value)}
+                required
+                style={inputStyle}
+              />
+              <button type="submit" disabled={loadingAction === 'reset_pwd'} style={{ ...btnStyle, background: '#059669' }}>
+                {loadingAction === 'reset_pwd' ? 'Updating...' : 'Reset Password'}
+              </button>
+            </form>
+            {resetResult && (
+              <pre style={{ ...codeBlockStyle, maxHeight: '80px', margin: 0 }}>
+                Status: {resetResult.status}{'\n'}
+                {JSON.stringify(resetResult.data, null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
       </div>
+
 
       {/* 4. Token Tester Panel (Simulating Child Product Integration) */}
       <div style={{ background: '#0f172a', border: '2px solid #38bdf8', borderRadius: '12px', padding: '20px' }}>

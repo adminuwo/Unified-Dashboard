@@ -242,7 +242,7 @@ export const MarketingCampaignsTab = () => {
   });
 
   return (
-    <div className="marketing-tab-container" style={{ padding: '24px', color: '#F8FAFC' }}>
+    <div className="marketing-tab-container" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', color: '#F8FAFC' }}>
       {/* Toast Feedback */}
       {copyFeedback && (
         <div
@@ -329,118 +329,165 @@ export const MarketingCampaignsTab = () => {
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '18px',
-          marginBottom: '28px',
-        }}
-      >
-        {/* Total Clicks */}
+      {/* KPI Cards Grid - Balanced 3 + 2 Architecture */}
+      <div style={{ marginBottom: '28px', width: '100%' }}>
+        {/* Row 1: Core Growth Metrics (3 Cards) */}
         <div
           style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+            marginBottom: '16px',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
-            <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Total Referral Clicks
-            </span>
-            <span style={{ fontSize: '20px' }}>🖱️</span>
-          </div>
-          <div style={{ fontSize: '32px', fontWeight: '900', color: '#38BDF8', marginTop: '10px' }}>
-            {summary?.total_clicks?.toLocaleString() || '0'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-            Across {summary?.total_links || links.length} active campaigns
-          </div>
-        </div>
-
-        {/* Unique Reach */}
-        <div
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
-            <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Unique Audience Reach
-            </span>
-            <span style={{ fontSize: '20px' }}>👥</span>
-          </div>
-          <div style={{ fontSize: '32px', fontWeight: '900', color: '#10B981', marginTop: '10px' }}>
-            {summary?.unique_reach?.toLocaleString() || '0'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-            Unique individuals visiting via links
-          </div>
-        </div>
-
-        {/* Top Performing Post */}
-        <div
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
-            <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Best Performing Post
-            </span>
-            <span style={{ fontSize: '20px' }}>🏆</span>
-          </div>
+          {/* Total Clicks */}
           <div
             style={{
-              fontSize: '18px',
-              fontWeight: '900',
-              color: '#F59E0B',
-              marginTop: '10px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '16px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
             }}
           >
-            {summary?.top_post?.post_name || 'No post data yet'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Total Referral Clicks
+              </span>
+              <span style={{ fontSize: '18px' }}>🖱️</span>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: '900', color: '#38BDF8', marginTop: '8px' }}>
+              {summary?.total_clicks?.toLocaleString() || '0'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+              Across {summary?.total_links || links.length} active campaigns
+            </div>
           </div>
-          <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
-            {summary?.top_post ? `${summary.top_post.total_clicks} clicks (${summary.top_post.platform})` : 'Start a campaign to view'}
+
+          {/* Unique Reach */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '16px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Unique Audience Reach
+              </span>
+              <span style={{ fontSize: '18px' }}>👥</span>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: '900', color: '#10B981', marginTop: '8px' }}>
+              {summary?.unique_reach?.toLocaleString() || '0'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+              Unique individuals visiting via links
+            </div>
+          </div>
+
+          {/* App Downloads */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '16px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                App Downloads
+              </span>
+              <span style={{ fontSize: '18px' }}>📲</span>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: '900', color: '#A855F7', marginTop: '8px' }}>
+              {summary?.total_downloads?.toLocaleString() || '0'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+              {summary?.overall_conversion_rate || 0}% overall conversion rate
+            </div>
           </div>
         </div>
 
-        {/* Top Platform */}
+        {/* Row 2: Performance Leaders (2 Equal Width Cards) */}
         <div
           style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '16px',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
-            <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Top Channel
-            </span>
-            <span style={{ fontSize: '20px' }}>📱</span>
+          {/* Best Performing Post */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '16px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Best Performing Post
+              </span>
+              <span style={{ fontSize: '18px' }}>🏆</span>
+            </div>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: '900',
+                color: '#F59E0B',
+                marginTop: '8px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={summary?.top_post?.post_name || 'No post data yet'}
+            >
+              {summary?.top_post?.post_name || 'No post data yet'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
+              {summary?.top_post ? `${summary.top_post.total_clicks} clicks (${summary.top_post.platform})` : 'Start a campaign to view'}
+            </div>
           </div>
-          <div style={{ fontSize: '22px', fontWeight: '900', color: '#EC4899', marginTop: '10px' }}>
-            {summary?.top_platform ? `${summary.top_platform.icon} ${summary.top_platform.name}` : 'No traffic yet'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
-            {summary?.top_platform ? `${summary.top_platform.clicks} clicks (${summary.top_platform.share_pct}%)` : 'Ready for tracking'}
+
+          {/* Top Channel */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '16px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#94A3B8' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Top Channel
+              </span>
+              <span style={{ fontSize: '18px' }}>📱</span>
+            </div>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: '900',
+                color: '#EC4899',
+                marginTop: '8px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {summary?.top_platform ? `${summary.top_platform.name}` : 'No traffic yet'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
+              {summary?.top_platform ? `${summary.top_platform.clicks} clicks (${summary.top_platform.share_pct}%)` : 'Ready for tracking'}
+            </div>
           </div>
         </div>
       </div>
@@ -628,7 +675,7 @@ export const MarketingCampaignsTab = () => {
           boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
         }}
       >
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
             <thead>
               <tr style={{ backgroundColor: '#1E293B', color: '#94A3B8', borderBottom: '1px solid #334155' }}>
@@ -638,6 +685,8 @@ export const MarketingCampaignsTab = () => {
                 <th style={{ padding: '14px 18px', fontWeight: '800' }}>Short Redirect URL</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Total Clicks</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Unique Reach</th>
+                <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Downloads</th>
+                <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Conv. %</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Status</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'right' }}>Actions</th>
               </tr>
@@ -771,6 +820,37 @@ export const MarketingCampaignsTab = () => {
                           }}
                         >
                           {link.unique_clicks}
+                        </span>
+                      </td>
+
+                      {/* Downloads */}
+                      <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            fontWeight: '900',
+                            fontSize: '15px',
+                            color: (link.total_downloads || 0) > 0 ? '#A855F7' : '#64748B',
+                          }}
+                        >
+                          {link.total_downloads || 0}
+                        </span>
+                      </td>
+
+                      {/* Conversion Rate */}
+                      <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            fontWeight: '800',
+                            fontSize: '12px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: (link.total_downloads || 0) > 0 ? 'rgba(168, 85, 247, 0.18)' : 'rgba(100, 116, 139, 0.1)',
+                            color: (link.total_downloads || 0) > 0 ? '#C084FC' : '#64748B',
+                          }}
+                        >
+                          {link.total_clicks > 0
+                            ? `${(((link.total_downloads || 0) / link.total_clicks) * 100).toFixed(1)}%`
+                            : '0.0%'}
                         </span>
                       </td>
 
@@ -1048,6 +1128,97 @@ export const MarketingCampaignsTab = () => {
                       </button>
                     ))}
                   </div>
+
+                  {/* Quick Google Play Store Link Presets */}
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase' }}>
+                      App Store Presets:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('ailegal');
+                        setCustomTargetUrl('https://play.google.com/store/apps/details?id=com.uwo.ailegal');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: customTargetUrl.includes('com.uwo.ailegal') ? 'rgba(16,185,129,0.2)' : '#1E293B',
+                        border: `1px solid ${customTargetUrl.includes('com.uwo.ailegal') ? '#10B981' : '#334155'}`,
+                        color: customTargetUrl.includes('com.uwo.ailegal') ? '#34D399' : '#CBD5E1',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      🤖 AI Legal Play Store
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('aisa');
+                        setCustomTargetUrl('https://play.google.com/store/apps/details?id=com.uwo.aisa');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: customTargetUrl.includes('com.uwo.aisa') ? 'rgba(16,185,129,0.2)' : '#1E293B',
+                        border: `1px solid ${customTargetUrl.includes('com.uwo.aisa') ? '#10B981' : '#334155'}`,
+                        color: customTargetUrl.includes('com.uwo.aisa') ? '#34D399' : '#CBD5E1',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      🤖 AISA Play Store
+                    </button>
+                    {customTargetUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomTargetUrl('')}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          color: '#EF4444',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕ Reset to Web Default
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {customTargetUrl.includes('play.google.com') && (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(16,185,129,0.12)',
+                        border: '1px solid rgba(16,185,129,0.3)',
+                        color: '#34D399',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <span>✨</span>
+                      <span>
+                        <strong>Google Play Install Referrer Active!</strong> Installs from this link will be automatically tracked in the <strong>Downloads</strong> column.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Custom URL Input if selected */}
@@ -1368,22 +1539,72 @@ export const MarketingCampaignsTab = () => {
             </div>
 
             {/* Quick Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
               <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
                 <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Total Clicks</div>
                 <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
-                  {detailsModalLink.link?.total_clicks}
+                  {detailsModalLink.link?.total_clicks || 0}
                 </div>
               </div>
               <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Unique People Reach</div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Unique Reach</div>
                 <div style={{ fontSize: '24px', fontWeight: '900', color: '#10B981', marginTop: '4px' }}>
-                  {detailsModalLink.link?.unique_clicks}
+                  {detailsModalLink.link?.unique_clicks || 0}
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
+                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Downloads</div>
+                <div style={{ fontSize: '24px', fontWeight: '900', color: '#A855F7', marginTop: '4px' }}>
+                  {detailsModalLink.link?.total_downloads || 0}
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
+                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Conversion %</div>
+                <div style={{ fontSize: '24px', fontWeight: '900', color: '#C084FC', marginTop: '4px' }}>
+                  {detailsModalLink.link?.total_clicks > 0
+                    ? `${(((detailsModalLink.link?.total_downloads || 0) / detailsModalLink.link.total_clicks) * 100).toFixed(1)}%`
+                    : '0.0%'}
                 </div>
               </div>
             </div>
 
             {/* Recent Live Click Events */}
+            {/* Recent Verified App Installs */}
+            {detailsModalLink.recent_installs && detailsModalLink.recent_installs.length > 0 && (
+              <>
+                <h4 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 10px 0', color: '#CBD5E1' }}>
+                  📲 Recent Verified App Installs ({detailsModalLink.recent_installs.length})
+                </h4>
+                <div style={{ backgroundColor: '#1E293B', borderRadius: '14px', padding: '12px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
+                  {detailsModalLink.recent_installs.map((inst) => (
+                    <div
+                      key={inst.id || inst._id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '8px 0',
+                        borderBottom: '1px solid #334155',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: '700', color: '#C084FC' }}>
+                          🤖 Android Play Store Install (v{inst.version || '1.0.0'})
+                        </span>
+                        <span style={{ color: '#64748B', marginLeft: '8px' }}>
+                          Dev: {inst.device_id ? inst.device_id.slice(0, 8) + '...' : 'Unknown'}
+                        </span>
+                      </div>
+                      <div style={{ color: '#94A3B8', fontSize: '11px' }}>
+                        {new Date(inst.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })} {' '}
+                        {new Date(inst.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <h4 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 10px 0', color: '#CBD5E1' }}>
               ⚡ Recent Click Events
             </h4>

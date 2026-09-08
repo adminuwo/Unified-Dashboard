@@ -8,6 +8,7 @@ from src.marketing.models import (
     BatchMarketingLinkCreate,
     MarketingLinkResponse,
     MarketingAnalyticsSummary,
+    InstallTelemetryCreate,
 )
 from src.marketing.service import MarketingService, PRODUCT_CATALOG, PLATFORM_CONFIG
 
@@ -143,3 +144,29 @@ async def public_redirector(slug: str, request: Request):
         return RedirectResponse(url="https://aisa24.com?ref=invalid_or_expired_link", status_code=302)
 
     return RedirectResponse(url=dest_url, status_code=302)
+
+
+# ==============================================================================
+# 🎯 4. Public Mobile App Install Telemetry Endpoints
+# ==============================================================================
+@router.post("/telemetry/install", summary="Record verified mobile app install from Google Play install referrer")
+async def track_app_install(payload: InstallTelemetryCreate, request: Request):
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "127.0.0.1")
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    result = MarketingService.record_install(
+        slug=payload.slug,
+        product_id=payload.product_id,
+        install_referrer=payload.install_referrer,
+        platform=payload.platform,
+        device_id=payload.device_id,
+        version=payload.version,
+        ip=client_ip
+    )
+    return result
+
+
+@redirect_router.post("/api/marketing/telemetry/install", summary="Alias for app install telemetry")
+async def track_app_install_alias(payload: InstallTelemetryCreate, request: Request):
+    return await track_app_install(payload, request)

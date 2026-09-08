@@ -1,8 +1,10 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 from fastapi import HTTPException, status  # type: ignore
 from pymongo.database import Database  # type: ignore
 
+from src.config.settings import settings
 from src.modules.auth.repository import AuthRepository
 from src.modules.auth.utils import (
     hash_password,
@@ -13,6 +15,7 @@ from src.modules.auth.utils import (
     hash_token,
     REFRESH_TOKEN_EXPIRE_DAYS
 )
+
 
 
 class AuthService:
@@ -215,3 +218,95 @@ class AuthService:
             "created_at": user.get("created_at"),
             "last_login": user.get("last_login")
         }
+
+    def request_password_reset(self, email: str) -> Dict[str, Any]:
+        """Generate and dispatch a 6-digit OTP for password recovery."""
+        clean_email = email.strip().lower()
+        user = self.repo.get_user_by_email(clean_email)
+
+        # Generic response to prevent user enumeration attacks
+        generic_msg = "If your email is registered in our platform, a 6-digit verification code has been generated."
+
+        if not user:
+            return {"message": generic_msg, "otp_preview": None}
+
+        # Generate 6-digit cryptographic numeric OTP
+        otp = f"{secrets.randbelow(900000) + 100000:06d}"
+        otp_hash = hash_token(otp)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+        self.repo.save_password_reset(clean_email, otp_hash, expires_at)
+
+        # In dev or non-production environment, return otp_preview for easy testing
+        is_dev = settings.ENVIRONMENT.lower() != "production"
+        preview = otp if is_dev else None
+
+        return {
+            "message": "A 6-digit verification code has been sent to your email.",
+            "otp_preview": preview
+        }
+
+    def verify_reset_otp(self, email: str, otp: str) -> Dict[str, Any]:
+        """Verify that the provided OTP for the given email is valid and unexpired."""
+        clean_email = email.strip().lower()
+        reset_doc = self.repo.get_active_password_reset(clean_email)
+
+        if not reset_doc or reset_doc.get("is_used"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification code"
+            )
+
+        expires_at = reset_doc.get("expires_at")
+        if expires_at:
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at < datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Verification code has expired. Please request a new code."
+                )
+
+        clean_otp = str(otp).strip()
+        if hash_token(clean_otp) != reset_doc.get("otp_hash"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code"
+            )
+
+        return {"valid": True, "message": "Verification code is valid"}
+
+    def reset_password(self, email: str, otp: str, new_password: str) -> Dict[str, Any]:
+        """Validate OTP and update user password, invalidating old sessions."""
+        clean_email = email.strip().lower()
+
+        # 1. Verify OTP
+        self.verify_reset_otp(clean_email, otp)
+
+        # 2. Verify User
+        user = self.repo.get_user_by_email(clean_email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User account not found"
+            )
+
+        # 3. Hash new password and update in repository
+        new_hash = hash_password(new_password)
+        self.repo.update_user_password(user["_id"], new_hash)
+
+        # 4. Mark OTP reset record as used
+        reset_doc = self.repo.get_active_password_reset(clean_email)
+        if reset_doc:
+            self.repo.mark_password_reset_used(reset_doc["_id"])
+
+        # 5. Revoke all existing sessions for security
+        self.repo.delete_all_user_sessions(user["_id"])
+
+        return {
+            "success": True,
+            "message": "Password reset successfully. You can now sign in with your new password."
+        }
+

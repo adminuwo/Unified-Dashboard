@@ -51,3 +51,34 @@ class ValidateResponse(BaseModel):
     valid: bool
     user: Optional[ValidateResponseUser] = None
     message: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    otp_preview: Optional[str] = None
+
+
+class VerifyResetOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=10)
+
+
+class VerifyResetOtpResponse(BaseModel):
+    valid: bool
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=10)
+    new_password: str = Field(..., min_length=6, description="New password (min 6 characters)")
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
+

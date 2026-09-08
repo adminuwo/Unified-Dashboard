@@ -12,9 +12,16 @@ from src.modules.auth.schemas import (
     LogoutRequest,
     UserResponse,
     ValidateRequest,
-    ValidateResponse
+    ValidateResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    VerifyResetOtpRequest,
+    VerifyResetOtpResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse
 )
 from src.modules.auth.service import AuthService
+
 
 router = APIRouter(prefix="/auth", tags=["Unified Auth Service"])
 
@@ -121,3 +128,50 @@ def validate_token(
 ):
     """Validate a JWT token for external product integrations (SSO Integration Bridge)."""
     return service.validate_token(payload.token)
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    _app: Optional[Any] = Depends(validate_optional_app_key),
+    service: AuthService = Depends(get_auth_service)
+):
+    """Initiate password recovery by generating a 6-digit OTP."""
+    result = service.request_password_reset(email=payload.email)
+    return ForgotPasswordResponse(
+        message=result["message"],
+        otp_preview=result.get("otp_preview")
+    )
+
+
+@router.post("/verify-reset-otp", response_model=VerifyResetOtpResponse)
+def verify_reset_otp(
+    payload: VerifyResetOtpRequest,
+    _app: Optional[Any] = Depends(validate_optional_app_key),
+    service: AuthService = Depends(get_auth_service)
+):
+    """Verify if a 6-digit password reset OTP is valid and unexpired."""
+    result = service.verify_reset_otp(email=payload.email, otp=payload.otp)
+    return VerifyResetOtpResponse(
+        valid=result["valid"],
+        message=result["message"]
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password(
+    payload: ResetPasswordRequest,
+    _app: Optional[Any] = Depends(validate_optional_app_key),
+    service: AuthService = Depends(get_auth_service)
+):
+    """Reset user password using valid OTP and revoke prior active sessions."""
+    result = service.reset_password(
+        email=payload.email,
+        otp=payload.otp,
+        new_password=payload.new_password
+    )
+    return ResetPasswordResponse(
+        success=result["success"],
+        message=result["message"]
+    )
+

@@ -39,11 +39,23 @@ class MarketingLinkResponse(BaseModel):
     channel_type: str
     total_clicks: int = 0
     unique_clicks: int = 0
+    total_downloads: int = 0
+    unique_installs: int = 0
+    conversion_rate: Optional[float] = 0.0
     is_active: bool = True
     created_by: Optional[str] = "Admin"
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_clicked_at: Optional[datetime] = None
+
+
+class InstallTelemetryCreate(BaseModel):
+    product_id: str = Field(..., description="Product code e.g. ailegal, aisa")
+    slug: Optional[str] = Field(None, description="Referral campaign slug")
+    install_referrer: Optional[str] = Field(None, description="Raw Google Play install referrer string")
+    platform: str = Field("android", description="Mobile OS platform: android or ios")
+    device_id: Optional[str] = Field(None, description="Unique client device fingerprint or UUID")
+    version: Optional[str] = Field("1.0.0", description="Installed app version")
 
 
 class ClickTelemetry(BaseModel):
@@ -63,6 +75,8 @@ class MarketingAnalyticsSummary(BaseModel):
     total_links: int
     total_clicks: int
     unique_reach: int
+    total_downloads: int = 0
+    overall_conversion_rate: float = 0.0
     top_product: Optional[Dict[str, Any]] = None
     top_platform: Optional[Dict[str, Any]] = None
     top_post: Optional[Dict[str, Any]] = None

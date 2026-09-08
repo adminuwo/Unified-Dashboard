@@ -130,6 +130,11 @@ class MarketingService:
             query_dict["utm_term"] = channel_type
         query_dict["ref"] = slug
 
+        # If targeting Google Play, ensure Play Store referrer param carries the attribution token
+        if "play.google.com" in parsed.netloc or "play.google.com" in base_url:
+            inner_ref = f"utm_source={query_dict.get('utm_source', 'referral')}&utm_campaign={query_dict.get('utm_campaign', 'campaign')}&slug={slug}&ref={slug}"
+            query_dict["referrer"] = inner_ref
+
         new_query = urlencode(query_dict)
         return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
 
@@ -137,11 +142,12 @@ class MarketingService:
     def create_link(data: MarketingLinkCreate, base_request_url: str = "", creator: str = "Admin") -> Dict[str, Any]:
         db = _get_db()
 
-        # Resolve target base URL
+        # Resolve target base URL (ALWAYS honor custom_target_url if provided, e.g. Play Store URL)
         product_info = PRODUCT_CATALOG.get(data.product_id, PRODUCT_CATALOG["custom"])
-        target_url = data.custom_target_url if data.product_id == "custom" and data.custom_target_url else product_info["url"]
-        if not target_url:
-            target_url = data.custom_target_url or "https://aisa24.com"
+        if data.custom_target_url and data.custom_target_url.strip():
+            target_url = data.custom_target_url.strip()
+        else:
+            target_url = product_info.get("url") or "https://aisa24.com" 
 
         # Ensure scheme
         if not target_url.startswith("http://") and not target_url.startswith("https://"):
@@ -249,6 +255,11 @@ class MarketingService:
             item["id"] = str(item["_id"])
             item["_id"] = str(item["_id"])
             item.pop("unique_ips", None)
+            item.pop("unique_devices", None)
+            item["total_downloads"] = item.get("total_downloads", 0)
+            item["unique_installs"] = item.get("unique_installs", 0)
+            total_c = item.get("total_clicks", 0)
+            item["conversion_rate"] = round((item["total_downloads"] / total_c * 100), 1) if total_c > 0 else 0.0
             item["short_url"] = f"{base_host}/r/{item['slug']}" if base_host else f"/r/{item['slug']}"
             results.append(item)
 
@@ -360,7 +371,70 @@ class MarketingService:
                 }
             )
 
-        return link.get("full_destination_url") or link.get("target_url")
+        dest_url = link.get("full_destination_url") or link.get("target_url")
+        if dest_url and "play.google.com" in dest_url and "referrer=" not in dest_url:
+            sep = "&" if "?" in dest_url else "?"
+            dest_url = f"{dest_url}{sep}referrer=slug%3D{slug}%26utm_source%3Dcustom_referral"
+        return dest_url
+
+    @staticmethod
+    def record_install(
+        slug: Optional[str] = None,
+        product_id: Optional[str] = None,
+        install_referrer: Optional[str] = None,
+        platform: str = "android",
+        device_id: Optional[str] = None,
+        version: Optional[str] = None,
+        ip: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Records verified app install telemetry from mobile app install referrer."""
+        db = _get_db()
+        now = datetime.now(timezone.utc)
+
+        # If slug wasn't provided directly, extract from raw install_referrer string
+        if not slug and install_referrer:
+            match = re.search(r'(?:slug|ref_id|ref)=([a-zA-Z0-9_\-]+)', install_referrer)
+            if match:
+                slug = match.group(1)
+
+        link = None
+        if slug:
+            link = db.marketing_links.find_one({"slug": slug})
+
+        dev_key = device_id or ip or str(uuid.uuid4())
+        install_doc = {
+            "link_id": str(link["_id"]) if link else None,
+            "slug": slug or "unknown",
+            "product_id": (link.get("product_id") if link else product_id) or "unknown",
+            "platform": platform.lower(),
+            "device_id": device_id,
+            "install_referrer": install_referrer,
+            "version": version or "1.0.0",
+            "ip": ip,
+            "timestamp": now,
+        }
+        db.marketing_installs.insert_one(install_doc)
+
+        if link:
+            unique_devices = link.get("unique_devices", [])
+            is_unique = dev_key not in unique_devices
+
+            update_ops = {
+                "$inc": {"total_downloads": 1},
+                "$set": {"last_downloaded_at": now}
+            }
+            if is_unique:
+                update_ops["$inc"]["unique_installs"] = 1
+                update_ops["$push"] = {"unique_devices": {"$each": [dev_key], "$slice": -5000}}
+
+            db.marketing_links.update_one({"_id": link["_id"]}, update_ops)
+
+        return {
+            "success": True,
+            "slug": slug,
+            "attributed": bool(link),
+            "product_id": link.get("product_id") if link else product_id
+        }
 
     @staticmethod
     def get_analytics_summary() -> Dict[str, Any]:
@@ -369,9 +443,11 @@ class MarketingService:
 
         total_links = db.marketing_links.count_documents({})
         total_clicks = db.marketing_clicks.count_documents({})
+        total_downloads = db.marketing_installs.count_documents({})
 
         # Unique reach across all clicks
         unique_reach = len(db.marketing_clicks.distinct("ip_hash"))
+        overall_conversion_rate = round((total_downloads / total_clicks * 100), 1) if total_clicks > 0 else 0.0
 
         # Platform distribution aggregation
         platform_pipeline = [
@@ -452,6 +528,8 @@ class MarketingService:
             "total_links": total_links,
             "total_clicks": total_clicks,
             "unique_reach": unique_reach,
+            "total_downloads": total_downloads,
+            "overall_conversion_rate": overall_conversion_rate,
             "top_product": top_prod,
             "top_platform": top_plat,
             "top_post": top_post,
@@ -486,7 +564,17 @@ class MarketingService:
             c["id"] = str(c["_id"])
             c["_id"] = str(c["_id"])
 
-        return {"link": link, "recent_clicks": clicks}
+        installs = list(db.marketing_installs.find({"slug": link["slug"]}).sort("timestamp", -1).limit(50))
+        for inst in installs:
+            inst["id"] = str(inst["_id"])
+            inst["_id"] = str(inst["_id"])
+
+        link["total_downloads"] = link.get("total_downloads", 0)
+        link["unique_installs"] = link.get("unique_installs", 0)
+        total_c = link.get("total_clicks", 0)
+        link["conversion_rate"] = round((link["total_downloads"] / total_c * 100), 1) if total_c > 0 else 0.0
+
+        return {"link": link, "recent_clicks": clicks, "recent_installs": installs}
 
     @staticmethod
     def toggle_status(link_id: str, is_active: bool) -> bool:
