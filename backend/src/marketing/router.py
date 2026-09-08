@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path  # t
 from fastapi.responses import RedirectResponse, JSONResponse  # type: ignore
 
 from src.admin.router import get_current_admin
+from src.config.settings import settings
 from src.marketing.models import (
     MarketingLinkCreate,
     BatchMarketingLinkCreate,
@@ -18,6 +19,8 @@ redirect_router = APIRouter(tags=["Public Redirector"])
 
 def _get_base_url(request: Request) -> str:
     """Resolve current public host base URL."""
+    if settings.SHORT_LINK_BASE_URL:
+        return settings.SHORT_LINK_BASE_URL.rstrip('/')
     proto = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8000"))
     return f"{proto}://{host}"
