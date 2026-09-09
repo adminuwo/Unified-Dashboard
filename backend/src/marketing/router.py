@@ -170,7 +170,7 @@ async def track_app_install(payload: InstallTelemetryCreate, request: Request):
         app_code=payload.app_code,
         referral_code=payload.referral_code,
         ref_code=payload.ref_code,
-        install_referrer=payload.install_referrer,
+        install_referrer=payload.effective_install_referrer,
         platform=payload.platform,
         device_id=payload.device_id,
         version=payload.version,

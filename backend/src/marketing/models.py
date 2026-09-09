@@ -57,12 +57,26 @@ class InstallTelemetryCreate(BaseModel):
     slug: Optional[str] = Field(None, description="Referral campaign slug")
     referral_code: Optional[str] = Field(None, description="Referral code alias for slug")
     ref_code: Optional[str] = Field(None, description="Short referral code alias")
-    install_referrer: Optional[str] = Field(None, description="Raw Google Play install referrer string")
+    install_referrer: Optional[str] = Field(None, description="Raw Google Play install referrer string (snake_case)")
+    installReferrer: Optional[str] = Field(None, description="Raw Google Play install referrer string (camelCase alias)")
+    click_timestamp: Optional[int] = Field(None, description="Referrer click timestamp (seconds)")
+    clickTimestamp: Optional[int] = Field(None, description="Referrer click timestamp alias")
+    install_timestamp: Optional[int] = Field(None, description="Install begin timestamp (seconds)")
+    installTimestamp: Optional[int] = Field(None, description="Install begin timestamp alias")
     platform: str = Field("android", description="Mobile OS platform: android or ios")
     device_id: Optional[str] = Field(None, description="Unique client device fingerprint or UUID")
     version: Optional[str] = Field("1.0.0", description="Installed app version")
     ip: Optional[str] = Field(None, description="Explicit client IP if provided")
     user_id: Optional[str] = Field(None, description="Authenticated user ID if available")
+
+    model_config = {
+        "extra": "ignore",
+        "populate_by_name": True
+    }
+
+    @property
+    def effective_install_referrer(self) -> Optional[str]:
+        return self.install_referrer or self.installReferrer
 
 
 class ClickTelemetry(BaseModel):

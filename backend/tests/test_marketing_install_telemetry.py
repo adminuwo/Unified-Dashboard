@@ -173,3 +173,32 @@ def test_legacy_link_safe_integer_update():
     # Cleanup test doc
     db.marketing_links.delete_one({"_id": link_id})
     db.marketing_installs.delete_many({"slug": slug})
+
+
+def test_react_native_play_install_referrer_payload(client):
+    """Verify that the exact payload format from react-native-play-install-referrer works flawlessly."""
+    data = MarketingLinkCreate(
+        product_id="aisa",
+        platform="instagram",
+        campaign_name="rn_campaign",
+        post_name="rn_reel"
+    )
+    link = MarketingService.create_link(data)
+    slug = link["slug"]
+
+    # Exact payload structure from react-native-play-install-referrer
+    rn_payload = {
+        "platform": "android",
+        "installReferrer": f"utm_source=friend_promo&utm_content={slug}",
+        "clickTimestamp": 1725883200,
+        "installTimestamp": 1725883260
+    }
+
+    res = client.post("/api/marketing/telemetry/install", json=rn_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["attributed"] is True
+    assert data["slug"] == slug
+    assert data["attribution_method"] == "install_referrer"
+    assert data["android_downloads"] >= 1
