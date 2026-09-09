@@ -31,6 +31,21 @@ export const MarketingCampaignsTab = () => {
   const [detailsModalLink, setDetailsModalLink] = useState(null);
   const [copyFeedback, setCopyFeedback] = useState('');
 
+  // Auto-Refresh & Live Telemetry State
+  const [isLiveActive, setIsLiveActive] = useState(true);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(10);
+  const [lastSynced, setLastSynced] = useState(null);
+
+  // Test Install Simulation Modal State
+  const [testInstallModalLink, setTestInstallModalLink] = useState(null);
+  const [installPlatform, setInstallPlatform] = useState('android');
+  const [installDeviceId, setInstallDeviceId] = useState('');
+  const [installAppVersion, setInstallAppVersion] = useState('1.0.0');
+  const [installClientIp, setInstallClientIp] = useState('127.0.0.1');
+  const [installReferrerCustom, setInstallReferrerCustom] = useState('');
+  const [isSubmittingInstall, setIsSubmittingInstall] = useState(false);
+  const [installTestResult, setInstallTestResult] = useState(null);
+
   // Default fallback catalog if API is loading
   const defaultProducts = {
     aisa: { name: 'AISA', url: 'https://aisa24.com', color: '#6366F1', icon: '🤖' },
@@ -61,9 +76,9 @@ export const MarketingCampaignsTab = () => {
   const products = config?.products || defaultProducts;
   const platforms = config?.platforms || defaultPlatforms;
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
 
       const [cfgRes, sumRes, linksRes] = await Promise.all([
@@ -86,16 +101,55 @@ export const MarketingCampaignsTab = () => {
         const linksData = await linksRes.json();
         setLinks(Array.isArray(linksData) ? linksData : []);
       }
+      setLastSynced(new Date());
     } catch (err) {
       console.error('Error fetching marketing telemetry:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchData();
   }, [token]);
+
+  // Real-time Auto-Refresh interval (every second decrements countdown, triggers silent update on 0)
+  useEffect(() => {
+    if (!isLiveActive) return;
+
+    const timer = setInterval(() => {
+      setAutoRefreshCountdown((prev) => {
+        if (prev <= 1) {
+          fetchData(true);
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isLiveActive, token]);
+
+  // Immediate refresh on window focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isLiveActive) {
+        fetchData(true);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isLiveActive, token]);
+
+  const getShortUrl = (linkObj) => {
+    if (!linkObj) return '';
+    // If backend provided a custom short URL that doesn't point to localhost, use it
+    if (linkObj.short_url && !linkObj.short_url.includes('localhost') && !linkObj.short_url.includes('127.0.0.1')) {
+      return linkObj.short_url;
+    }
+    // In production or browser, dynamically use current window origin (e.g. https://unified.aisa24.com)
+    return `${window.location.origin}/r/${linkObj.slug}`;
+  };
 
   const handleCopy = (text, label) => {
     navigator.clipboard.writeText(text);
@@ -226,6 +280,67 @@ export const MarketingCampaignsTab = () => {
     }
   };
 
+  const openTestInstallModal = (link) => {
+    const randomHex = Math.random().toString(36).substring(2, 10);
+    setTestInstallModalLink(link);
+    setInstallPlatform('android');
+    setInstallDeviceId(`dev_test_${randomHex}`);
+    setInstallAppVersion('1.0.0');
+    setInstallClientIp('127.0.0.1');
+    setInstallReferrerCustom(`utm_source=referral&slug=${link.slug}&utm_content=mobile`);
+    setInstallTestResult(null);
+  };
+
+  const handleSimulateInstall = async (e) => {
+    e.preventDefault();
+    if (!testInstallModalLink) return;
+    setIsSubmittingInstall(true);
+    setInstallTestResult(null);
+    try {
+      const payload = {
+        platform: installPlatform,
+        app_code: testInstallModalLink.product_id,
+        slug: testInstallModalLink.slug,
+        referral_code: testInstallModalLink.slug,
+        device_id: installDeviceId || `dev_${Math.random().toString(36).substring(2, 10)}`,
+        version: installAppVersion || '1.0.0',
+        ip: installClientIp || '127.0.0.1',
+      };
+
+      if (installPlatform === 'android') {
+        payload.install_referrer = installReferrerCustom || `utm_source=referral&slug=${testInstallModalLink.slug}`;
+      }
+
+      const res = await fetch('/api/marketing/telemetry/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      setInstallTestResult({
+        ok: res.ok,
+        status: res.status,
+        data,
+      });
+
+      if (res.ok) {
+        // Trigger real-time update
+        fetchData(true);
+        if (detailsModalLink && (detailsModalLink.link?.id === testInstallModalLink.id || detailsModalLink.link?.slug === testInstallModalLink.slug)) {
+          openDetails(testInstallModalLink);
+        }
+      }
+    } catch (err) {
+      setInstallTestResult({
+        ok: false,
+        error: err.message,
+      });
+    } finally {
+      setIsSubmittingInstall(false);
+    }
+  };
+
   // Filtered links
   const filteredLinks = links.filter((l) => {
     const matchSearch =
@@ -329,6 +444,82 @@ export const MarketingCampaignsTab = () => {
         </div>
       </div>
 
+      {/* Live Real-time Auto-Sync Status Bar */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: isLiveActive ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+          border: `1px solid ${isLiveActive ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`,
+          borderRadius: '14px',
+          padding: '10px 18px',
+          marginBottom: '20px',
+          flexWrap: 'wrap',
+          gap: '12px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span
+            style={{
+              width: '9px',
+              height: '9px',
+              borderRadius: '50%',
+              background: isLiveActive ? '#10B981' : '#F59E0B',
+              boxShadow: isLiveActive ? '0 0 10px #10B981' : '0 0 10px #F59E0B',
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontSize: '13px', color: isLiveActive ? '#34D399' : '#FBBF24', fontWeight: '800' }}>
+            {isLiveActive ? '⚡ Real-time Referral & Install Telemetry Active' : '⏸️ Auto-Sync Paused'}
+          </span>
+          {lastSynced && (
+            <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+              • Last synced: {lastSynced.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isLiveActive && (
+            <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+              Auto-refresh in <strong style={{ color: '#38BDF8', fontWeight: '800' }}>{autoRefreshCountdown}s</strong>
+            </span>
+          )}
+          <button
+            onClick={() => setIsLiveActive((prev) => !prev)}
+            style={{
+              background: 'transparent',
+              border: '1px solid #334155',
+              color: '#94A3B8',
+              borderRadius: '8px',
+              padding: '5px 12px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+            }}
+          >
+            {isLiveActive ? '⏸️ Pause' : '▶️ Resume'}
+          </button>
+          <button
+            onClick={() => fetchData(false)}
+            disabled={loading}
+            style={{
+              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38BDF8',
+              borderRadius: '8px',
+              padding: '5px 14px',
+              fontSize: '11px',
+              fontWeight: '800',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? '⟳ Syncing...' : '⟳ Refresh Now'}
+          </button>
+        </div>
+      </div>
+
       {/* KPI Cards Grid - Balanced 3 + 2 Architecture */}
       <div style={{ marginBottom: '28px', width: '100%' }}>
         {/* Row 1: Core Growth Metrics (3 Cards) */}
@@ -404,10 +595,42 @@ export const MarketingCampaignsTab = () => {
               </span>
               <span style={{ fontSize: '18px' }}>📲</span>
             </div>
-            <div style={{ fontSize: '30px', fontWeight: '900', color: '#A855F7', marginTop: '8px' }}>
-              {summary?.total_downloads?.toLocaleString() || '0'}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '30px', fontWeight: '900', color: '#A855F7' }}>
+                {summary?.total_downloads?.toLocaleString() || '0'}
+              </span>
+              <div style={{ display: 'flex', gap: '6px', fontSize: '11px', fontWeight: '700' }}>
+                <span
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    color: '#34D399',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  🤖 Android: {summary?.android_downloads ?? summary?.downloads_by_platform?.android ?? 0}
+                </span>
+                <span
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38BDF8',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  🍏 iOS: {summary?.ios_downloads ?? summary?.downloads_by_platform?.ios ?? 0}
+                </span>
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
               {summary?.overall_conversion_rate || 0}% overall conversion rate
             </div>
           </div>
@@ -685,7 +908,7 @@ export const MarketingCampaignsTab = () => {
                 <th style={{ padding: '14px 18px', fontWeight: '800' }}>Short Redirect URL</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Total Clicks</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Unique Reach</th>
-                <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Downloads</th>
+                <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Downloads (🤖 / 🍏)</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Conv. %</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'center' }}>Status</th>
                 <th style={{ padding: '14px 18px', fontWeight: '800', textAlign: 'right' }}>Actions</th>
@@ -694,13 +917,13 @@ export const MarketingCampaignsTab = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                  <td colSpan="10" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                     Loading marketing links...
                   </td>
                 </tr>
               ) : filteredLinks.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                  <td colSpan="10" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                     No marketing links found. Click <strong>+ Generate Tracked Link</strong> above to create your first post campaign!
                   </td>
                 </tr>
@@ -782,7 +1005,7 @@ export const MarketingCampaignsTab = () => {
                             /r/{link.slug}
                           </code>
                           <button
-                            onClick={() => handleCopy(link.short_url || `${window.location.origin}/r/${link.slug}`, 'Short link')}
+                            onClick={() => handleCopy(getShortUrl(link), 'Short link')}
                             title="Copy Short URL"
                             style={{
                               backgroundColor: 'transparent',
@@ -825,15 +1048,43 @@ export const MarketingCampaignsTab = () => {
 
                       {/* Downloads */}
                       <td style={{ padding: '14px 18px', textAlign: 'center' }}>
-                        <span
-                          style={{
-                            fontWeight: '900',
-                            fontSize: '15px',
-                            color: (link.total_downloads || 0) > 0 ? '#A855F7' : '#64748B',
-                          }}
-                        >
-                          {link.total_downloads || 0}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <span
+                            style={{
+                              fontWeight: '900',
+                              fontSize: '15px',
+                              color: (link.total_downloads || 0) > 0 ? '#A855F7' : '#64748B',
+                            }}
+                          >
+                            {link.total_downloads || 0}
+                          </span>
+                          <div style={{ display: 'flex', gap: '4px', fontSize: '10px', fontWeight: '800' }}>
+                            <span
+                              title={`Android Downloads: ${link.android_downloads || 0}`}
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                backgroundColor: (link.android_downloads || 0) > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(30, 41, 59, 0.8)',
+                                color: (link.android_downloads || 0) > 0 ? '#34D399' : '#64748B',
+                                border: '1px solid rgba(16, 185, 129, 0.25)',
+                              }}
+                            >
+                              🤖 {link.android_downloads || 0}
+                            </span>
+                            <span
+                              title={`iOS Downloads: ${link.ios_downloads || 0}`}
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                backgroundColor: (link.ios_downloads || 0) > 0 ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.8)',
+                                color: (link.ios_downloads || 0) > 0 ? '#38BDF8' : '#64748B',
+                                border: '1px solid rgba(56, 189, 248, 0.25)',
+                              }}
+                            >
+                              🍏 {link.ios_downloads || 0}
+                            </span>
+                          </div>
+                        </div>
                       </td>
 
                       {/* Conversion Rate */}
@@ -911,8 +1162,28 @@ export const MarketingCampaignsTab = () => {
                           </button>
 
                           <button
+                            onClick={() => openTestInstallModal(link)}
+                            title="Simulate Real-time App Install Telemetry (Android / iOS)"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '8px',
+                              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%)',
+                              border: '1px solid rgba(168, 85, 247, 0.5)',
+                              color: '#D8B4FE',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              fontWeight: '800',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ⚡ Test Install
+                          </button>
+
+                          <button
                             onClick={() => openDetails(link)}
-                            title="View Click Telemetry"
+                            title="View Click & Install Telemetry"
                             style={{
                               padding: '6px 10px',
                               borderRadius: '8px',
@@ -1026,7 +1297,7 @@ export const MarketingCampaignsTab = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
                   {generatedBatchResult.map((resLink) => {
                     const p = platforms[resLink.platform] || { name: resLink.platform, icon: '🔗' };
-                    const shortUrl = resLink.short_url || `${window.location.origin}/r/${resLink.slug}`;
+                    const shortUrl = getShortUrl(resLink);
                     return (
                       <div
                         key={resLink.id || resLink.slug}
@@ -1476,7 +1747,7 @@ export const MarketingCampaignsTab = () => {
             <div style={{ backgroundColor: '#FFFFFF', padding: '16px', borderRadius: '16px', display: 'inline-block', marginBottom: '20px' }}>
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                  qrModalLink.short_url || `${window.location.origin}/r/${qrModalLink.slug}`
+                  getShortUrl(qrModalLink)
                 )}`}
                 alt="QR Code"
                 style={{ width: '220px', height: '220px', display: 'block' }}
@@ -1484,13 +1755,13 @@ export const MarketingCampaignsTab = () => {
             </div>
 
             <div style={{ fontSize: '12px', color: '#38BDF8', wordBreak: 'break-all', marginBottom: '20px' }}>
-              {qrModalLink.short_url || `${window.location.origin}/r/${qrModalLink.slug}`}
+              {getShortUrl(qrModalLink)}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={() =>
-                  handleCopy(qrModalLink.short_url || `${window.location.origin}/r/${qrModalLink.slug}`, 'Short Link')
+                  handleCopy(getShortUrl(qrModalLink), 'Short Link')
                 }
                 style={{
                   flex: 1,
@@ -1583,28 +1854,34 @@ export const MarketingCampaignsTab = () => {
             </div>
 
             {/* Quick Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Total Clicks</div>
-                <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ backgroundColor: '#1E293B', padding: '12px 14px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Total Clicks</div>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
                   {detailsModalLink.link?.total_clicks || 0}
                 </div>
               </div>
-              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Unique Reach</div>
-                <div style={{ fontSize: '24px', fontWeight: '900', color: '#10B981', marginTop: '4px' }}>
+              <div style={{ backgroundColor: '#1E293B', padding: '12px 14px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Unique Reach</div>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#10B981', marginTop: '4px' }}>
                   {detailsModalLink.link?.unique_clicks || 0}
                 </div>
               </div>
-              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Downloads</div>
-                <div style={{ fontSize: '24px', fontWeight: '900', color: '#A855F7', marginTop: '4px' }}>
-                  {detailsModalLink.link?.total_downloads || 0}
+              <div style={{ backgroundColor: '#1E293B', padding: '12px 14px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>🤖 Android Installs</div>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#34D399', marginTop: '4px' }}>
+                  {detailsModalLink.link?.android_downloads || 0}
                 </div>
               </div>
-              <div style={{ backgroundColor: '#1E293B', padding: '14px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Conversion %</div>
-                <div style={{ fontSize: '24px', fontWeight: '900', color: '#C084FC', marginTop: '4px' }}>
+              <div style={{ backgroundColor: '#1E293B', padding: '12px 14px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>🍏 iOS Installs</div>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
+                  {detailsModalLink.link?.ios_downloads || 0}
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#1E293B', padding: '12px 14px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800' }}>Total Conv. %</div>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#C084FC', marginTop: '4px' }}>
                   {detailsModalLink.link?.total_clicks > 0
                     ? `${(((detailsModalLink.link?.total_downloads || 0) / detailsModalLink.link.total_clicks) * 100).toFixed(1)}%`
                     : '0.0%'}
@@ -1612,42 +1889,78 @@ export const MarketingCampaignsTab = () => {
               </div>
             </div>
 
-            {/* Recent Live Click Events */}
             {/* Recent Verified App Installs */}
-            {detailsModalLink.recent_installs && detailsModalLink.recent_installs.length > 0 && (
-              <>
-                <h4 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 10px 0', color: '#CBD5E1' }}>
-                  📲 Recent Verified App Installs ({detailsModalLink.recent_installs.length})
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: '#CBD5E1' }}>
+                  📲 Recent Verified App Installs ({detailsModalLink.recent_installs?.length || 0})
                 </h4>
-                <div style={{ backgroundColor: '#1E293B', borderRadius: '14px', padding: '12px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
-                  {detailsModalLink.recent_installs.map((inst) => (
-                    <div
-                      key={inst.id || inst._id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '8px 0',
-                        borderBottom: '1px solid #334155',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontWeight: '700', color: '#C084FC' }}>
-                          🤖 Android Play Store Install (v{inst.version || '1.0.0'})
-                        </span>
-                        <span style={{ color: '#64748B', marginLeft: '8px' }}>
-                          Dev: {inst.device_id ? inst.device_id.slice(0, 8) + '...' : 'Unknown'}
-                        </span>
+                <button
+                  onClick={() => openTestInstallModal(detailsModalLink.link)}
+                  style={{
+                    background: 'rgba(168, 85, 247, 0.2)',
+                    border: '1px solid rgba(168, 85, 247, 0.4)',
+                    color: '#D8B4FE',
+                    borderRadius: '6px',
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⚡ Simulate Install Now
+                </button>
+              </div>
+              <div style={{ backgroundColor: '#1E293B', borderRadius: '14px', padding: '12px', maxHeight: '180px', overflowY: 'auto' }}>
+                {!detailsModalLink.recent_installs || detailsModalLink.recent_installs.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#64748B', padding: '20px', fontSize: '12px' }}>
+                    No app installs attributed to this referral link yet. Click "⚡ Simulate Install Now" to test!
+                  </div>
+                ) : (
+                  detailsModalLink.recent_installs.map((inst) => {
+                    const isIos = inst.platform?.toLowerCase() === 'ios';
+                    return (
+                      <div
+                        key={inst.id || inst._id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 0',
+                          borderBottom: '1px solid #334155',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: '700', color: isIos ? '#38BDF8' : '#34D399' }}>
+                            {isIos ? '🍏 iOS App Store Install' : '🤖 Android Play Store Install'} (v{inst.version || '1.0.0'})
+                          </span>
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              fontSize: '10px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(255,255,255,0.08)',
+                              color: '#94A3B8',
+                            }}
+                          >
+                            {inst.attribution_method || (isIos ? 'ios_ip_match' : 'android_play_referrer')}
+                          </span>
+                          <span style={{ color: '#64748B', marginLeft: '8px' }}>
+                            Dev: {inst.device_id ? inst.device_id.slice(0, 10) + '...' : 'Unknown'}
+                          </span>
+                        </div>
+                        <div style={{ color: '#94A3B8', fontSize: '11px' }}>
+                          {new Date(inst.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}{' '}
+                          {new Date(inst.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
-                      <div style={{ color: '#94A3B8', fontSize: '11px' }}>
-                        {new Date(inst.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })} {' '}
-                        {new Date(inst.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
             <h4 style={{ fontSize: '14px', fontWeight: '800', margin: '0 0 10px 0', color: '#CBD5E1' }}>
               ⚡ Recent Click Events
@@ -1682,6 +1995,323 @@ export const MarketingCampaignsTab = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ⚡ MODAL: Real-Time App Install Telemetry Simulator */}
+      {/* ========================================================================= */}
+      {testInstallModalLink && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #334155',
+              borderRadius: '24px',
+              padding: '28px',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.8)',
+              color: '#F8FAFC',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '900', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚡ Simulate App Install Telemetry
+                </h3>
+                <p style={{ color: '#94A3B8', fontSize: '12px', margin: '4px 0 0 0' }}>
+                  Test real-time conversion for referral link: <strong style={{ color: '#38BDF8' }}>/r/{testInstallModalLink.slug}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setTestInstallModalLink(null)}
+                style={{
+                  backgroundColor: '#1E293B',
+                  border: 'none',
+                  color: '#94A3B8',
+                  borderRadius: '10px',
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Target Campaign Overview Pill */}
+            <div
+              style={{
+                backgroundColor: '#1E293B',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                border: '1px solid #334155',
+                marginBottom: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '700' }}>
+                  Campaign & Post
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#FFFFFF', marginTop: '2px' }}>
+                  {testInstallModalLink.post_name} ({testInstallModalLink.campaign_name})
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '700' }}>
+                  Current Downloads
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#A855F7', marginTop: '2px' }}>
+                  🤖 {testInstallModalLink.android_downloads || 0} | 🍏 {testInstallModalLink.ios_downloads || 0} (Total: {testInstallModalLink.total_downloads || 0})
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSimulateInstall}>
+              {/* Platform Selector */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  1. Operating System / Platform
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div
+                    onClick={() => {
+                      setInstallPlatform('android');
+                      setInstallReferrerCustom(`utm_source=referral&slug=${testInstallModalLink.slug}&utm_content=mobile`);
+                    }}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '12px',
+                      backgroundColor: installPlatform === 'android' ? 'rgba(16, 185, 129, 0.15)' : '#1E293B',
+                      border: `2px solid ${installPlatform === 'android' ? '#10B981' : '#334155'}`,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontWeight: '800',
+                      color: installPlatform === 'android' ? '#34D399' : '#94A3B8',
+                      fontSize: '13px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    🤖 Android (Play Store)
+                  </div>
+                  <div
+                    onClick={() => setInstallPlatform('ios')}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '12px',
+                      backgroundColor: installPlatform === 'ios' ? 'rgba(56, 189, 248, 0.15)' : '#1E293B',
+                      border: `2px solid ${installPlatform === 'ios' ? '#38BDF8' : '#334155'}`,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontWeight: '800',
+                      color: installPlatform === 'ios' ? '#38BDF8' : '#94A3B8',
+                      fontSize: '13px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    🍏 iOS (App Store)
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform Specific Explanation */}
+              <div
+                style={{
+                  backgroundColor: installPlatform === 'android' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(56, 189, 248, 0.08)',
+                  border: `1px solid ${installPlatform === 'android' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(56, 189, 248, 0.25)'}`,
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  fontSize: '12px',
+                  color: installPlatform === 'android' ? '#A7F3D0' : '#BAE6FD',
+                }}
+              >
+                {installPlatform === 'android' ? (
+                  <span>
+                    <strong>Android Attribution:</strong> Simulates Google Play Install Referrer API returning campaign parameter <code>slug={testInstallModalLink.slug}</code> from the Play Store install receiver.
+                  </span>
+                ) : (
+                  <span>
+                    <strong>iOS Attribution:</strong> Simulates iOS App launch telemetry with probabilistic IP matching and direct referral code attribution for <code>{testInstallModalLink.slug}</code>.
+                  </span>
+                )}
+              </div>
+
+              {/* Device ID and App Version */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Unique Device ID
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={installDeviceId}
+                    onChange={(e) => setInstallDeviceId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      backgroundColor: '#1E293B',
+                      border: '1px solid #334155',
+                      borderRadius: '10px',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    App Version
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={installAppVersion}
+                    onChange={(e) => setInstallAppVersion(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      backgroundColor: '#1E293B',
+                      border: '1px solid #334155',
+                      borderRadius: '10px',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Android Specific: Referrer Payload */}
+              {installPlatform === 'android' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Google Play Install Referrer String
+                  </label>
+                  <input
+                    type="text"
+                    value={installReferrerCustom}
+                    onChange={(e) => setInstallReferrerCustom(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      backgroundColor: '#1E293B',
+                      border: '1px solid #334155',
+                      borderRadius: '10px',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* iOS Specific: Client IP */}
+              {installPlatform === 'ios' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Client IP Address (for IP Attribution Match)
+                  </label>
+                  <input
+                    type="text"
+                    value={installClientIp}
+                    onChange={(e) => setInstallClientIp(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      backgroundColor: '#1E293B',
+                      border: '1px solid #334155',
+                      borderRadius: '10px',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Result feedback */}
+              {installTestResult && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    backgroundColor: installTestResult.ok ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    border: `1px solid ${installTestResult.ok ? '#10B981' : '#EF4444'}`,
+                    color: installTestResult.ok ? '#34D399' : '#F87171',
+                    fontSize: '12px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  {installTestResult.ok ? (
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '13px', marginBottom: '4px' }}>
+                        🎉 Install Successfully Attributed in Real-Time!
+                      </div>
+                      <div>Attribution Method: <strong>{installTestResult.data?.attribution_method || 'verified'}</strong></div>
+                      <div>Platform: <strong>{installTestResult.data?.platform?.toUpperCase()}</strong></div>
+                      <div style={{ marginTop: '4px', fontWeight: '700' }}>
+                        Updated Link Downloads: 🤖 {installTestResult.data?.android_downloads ?? installTestResult.data?.link?.android_downloads ?? 0} Android | 🍏 {installTestResult.data?.ios_downloads ?? installTestResult.data?.link?.ios_downloads ?? 0} iOS (Total: {installTestResult.data?.total_downloads ?? installTestResult.data?.link?.total_downloads ?? 0})
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <strong>Simulation Failed:</strong> {installTestResult.error || JSON.stringify(installTestResult.data)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmittingInstall}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: installPlatform === 'android'
+                    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                    : 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontWeight: '800',
+                  fontSize: '13px',
+                  cursor: isSubmittingInstall ? 'not-allowed' : 'pointer',
+                  boxShadow: installPlatform === 'android'
+                    ? '0 8px 25px rgba(16, 185, 129, 0.35)'
+                    : '0 8px 25px rgba(56, 189, 248, 0.35)',
+                }}
+              >
+                {isSubmittingInstall
+                  ? 'Sending Install Telemetry...'
+                  : `🚀 Send Real ${installPlatform === 'android' ? 'Android' : 'iOS'} Install Telemetry`}
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -40,6 +40,8 @@ class MarketingLinkResponse(BaseModel):
     total_clicks: int = 0
     unique_clicks: int = 0
     total_downloads: int = 0
+    android_downloads: int = 0
+    ios_downloads: int = 0
     unique_installs: int = 0
     conversion_rate: Optional[float] = 0.0
     is_active: bool = True
@@ -50,12 +52,17 @@ class MarketingLinkResponse(BaseModel):
 
 
 class InstallTelemetryCreate(BaseModel):
-    product_id: str = Field(..., description="Product code e.g. ailegal, aisa")
+    product_id: Optional[str] = Field(None, description="Product code e.g. ailegal, aisa")
+    app_code: Optional[str] = Field(None, description="Alternative alias for product_id")
     slug: Optional[str] = Field(None, description="Referral campaign slug")
+    referral_code: Optional[str] = Field(None, description="Referral code alias for slug")
+    ref_code: Optional[str] = Field(None, description="Short referral code alias")
     install_referrer: Optional[str] = Field(None, description="Raw Google Play install referrer string")
     platform: str = Field("android", description="Mobile OS platform: android or ios")
     device_id: Optional[str] = Field(None, description="Unique client device fingerprint or UUID")
     version: Optional[str] = Field("1.0.0", description="Installed app version")
+    ip: Optional[str] = Field(None, description="Explicit client IP if provided")
+    user_id: Optional[str] = Field(None, description="Authenticated user ID if available")
 
 
 class ClickTelemetry(BaseModel):
@@ -76,6 +83,9 @@ class MarketingAnalyticsSummary(BaseModel):
     total_clicks: int
     unique_reach: int
     total_downloads: int = 0
+    android_downloads: int = 0
+    ios_downloads: int = 0
+    downloads_by_platform: Dict[str, int] = Field(default_factory=dict)
     overall_conversion_rate: float = 0.0
     top_product: Optional[Dict[str, Any]] = None
     top_platform: Optional[Dict[str, Any]] = None

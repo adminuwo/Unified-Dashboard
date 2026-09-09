@@ -3,7 +3,7 @@ import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
+from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse, unquote
 
 from src.database.connection import get_db_instance
 from src.marketing.models import (
@@ -184,11 +184,17 @@ class MarketingService:
             "total_clicks": 0,
             "unique_clicks": 0,
             "unique_ips": [],
+            "total_downloads": 0,
+            "android_downloads": 0,
+            "ios_downloads": 0,
+            "unique_installs": 0,
+            "unique_devices": [],
             "is_active": True,
             "created_by": creator,
             "created_at": now,
             "updated_at": now,
             "last_clicked_at": None,
+            "last_downloaded_at": None,
         }
 
         res = db.marketing_links.insert_one(doc)
@@ -256,8 +262,10 @@ class MarketingService:
             item["_id"] = str(item["_id"])
             item.pop("unique_ips", None)
             item.pop("unique_devices", None)
-            item["total_downloads"] = item.get("total_downloads", 0)
-            item["unique_installs"] = item.get("unique_installs", 0)
+            item["total_downloads"] = int(item.get("total_downloads") or 0)
+            item["android_downloads"] = int(item.get("android_downloads") or 0)
+            item["ios_downloads"] = int(item.get("ios_downloads") or 0)
+            item["unique_installs"] = int(item.get("unique_installs") or 0)
             total_c = item.get("total_clicks", 0)
             item["conversion_rate"] = round((item["total_downloads"] / total_c * 100), 1) if total_c > 0 else 0.0
             item["short_url"] = f"{base_host}/r/{item['slug']}" if base_host else f"/r/{item['slug']}"
@@ -386,25 +394,51 @@ class MarketingService:
         platform: str = "android",
         device_id: Optional[str] = None,
         version: Optional[str] = None,
-        ip: Optional[str] = None
+        ip: Optional[str] = None,
+        referral_code: Optional[str] = None,
+        ref_code: Optional[str] = None,
+        app_code: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Records verified app install telemetry from mobile app install referrer or iOS IP matching."""
         db = _get_db()
         now = datetime.now(timezone.utc)
-        attribution_method = "direct" if slug else ("referrer_param" if install_referrer else "none")
 
-        # 1. If slug wasn't provided directly, extract from raw install_referrer string (Android Play Store)
-        if not slug and install_referrer:
-            match = re.search(r'(?:slug|ref_id|ref)=([a-zA-Z0-9_\-]+)', install_referrer)
-            if match:
-                slug = match.group(1)
-                attribution_method = "install_referrer"
+        # 1. Resolve effective slug from slug, referral_code, ref_code
+        target_slug = (slug or referral_code or ref_code or "").strip()
+        effective_product = (product_id or app_code or "").strip().lower()
+
+        norm_platform = (platform or "android").strip().lower()
+        if "ios" in norm_platform or "iphone" in norm_platform or "ipad" in norm_platform:
+            norm_platform = "ios"
+        elif "android" in norm_platform:
+            norm_platform = "android"
+
+        attribution_method = "direct" if target_slug else ("referrer_param" if install_referrer else "none")
+
+        # 2. Extract slug from install_referrer if not explicitly passed
+        if not target_slug and install_referrer:
+            raw_ref = str(install_referrer).strip()
+            decoded_ref = unquote(raw_ref)
+
+            # Try matching on both decoded and raw strings
+            for candidate_str in [decoded_ref, raw_ref]:
+                match = re.search(r'(?:slug|ref_id|ref_code|referral_code|ref|utm_content)=([a-zA-Z0-9_\-]+)', candidate_str, re.IGNORECASE)
+                if match:
+                    target_slug = match.group(1).strip()
+                    attribution_method = "install_referrer"
+                    break
 
         link = None
-        if slug:
-            link = db.marketing_links.find_one({"slug": slug})
+        if target_slug:
+            # Exact match, case-insensitive match, or prefix strip
+            link = db.marketing_links.find_one({"slug": target_slug})
+            if not link:
+                link = db.marketing_links.find_one({"slug": {"$regex": f"^{re.escape(target_slug)}$", "$options": "i"}})
+            if not link and target_slug.lower().startswith("ref-"):
+                link = db.marketing_links.find_one({"slug": {"$regex": f"^{re.escape(target_slug[4:])}$", "$options": "i"}})
 
-        # 2. Probabilistic Attribution (iOS / IP-Match): If slug is not yet found, match by client IP
+        # 3. Probabilistic Attribution (iOS / IP-Match): If slug is not yet found, match by client IP
         if not link and ip:
             clean_ip = ip.strip()
             ip_hash = hashlib.sha256(clean_ip.encode()).hexdigest()[:16]
@@ -418,62 +452,122 @@ class MarketingService:
                 "timestamp": {"$gte": time_window}
             }
 
-            if product_id and product_id != "unknown":
-                norm_pid = product_id.lower().replace("-", "").replace("_", "")
-                patterns = [product_id, norm_pid]
+            candidate_click = None
+            if effective_product and effective_product not in ["unknown", "custom"]:
+                norm_pid = effective_product.replace("-", "").replace("_", "")
+                patterns = [effective_product, norm_pid]
                 if norm_pid in ["ailegal", "ai-legal", "legal"]:
                     patterns.extend(["ailegal", "ai-legal"])
                 elif norm_pid in ["aisa"]:
                     patterns.extend(["aisa"])
-                click_query["product_id"] = {"$in": list(set(patterns))}
 
-            recent_click = db.marketing_clicks.find_one(
-                click_query,
-                sort=[("timestamp", -1)]
-            )
+                prod_query = dict(click_query)
+                prod_query["product_id"] = {"$in": list(set(patterns))}
+                candidate_click = db.marketing_clicks.find_one(
+                    prod_query,
+                    sort=[("timestamp", -1)]
+                )
 
-            if recent_click and recent_click.get("slug"):
-                slug = recent_click["slug"]
-                link = db.marketing_links.find_one({"slug": slug})
+            if not candidate_click:
+                # Fallback to any recent mobile/OS click from this IP
+                os_query = dict(click_query)
+                if norm_platform == "ios":
+                    os_query["$or"] = [
+                        {"os": {"$in": ["iOS", "ios"]}},
+                        {"device_type": "Mobile"},
+                        {"client_ip": clean_ip},
+                        {"ip_hash": ip_hash}
+                    ]
+                candidate_click = db.marketing_clicks.find_one(
+                    os_query,
+                    sort=[("timestamp", -1)]
+                )
+
+            if candidate_click and candidate_click.get("slug"):
+                found_slug = candidate_click["slug"]
+                link = db.marketing_links.find_one({"slug": found_slug})
                 if link:
+                    target_slug = found_slug
                     attribution_method = "ip_match"
 
-        dev_key = device_id or ip or str(uuid.uuid4())
+        dev_key = device_id or (f"{ip}_{norm_platform}" if ip else str(uuid.uuid4()))
+        resolved_product = (link.get("product_id") if link else effective_product) or "unknown"
+
         install_doc = {
             "link_id": str(link["_id"]) if link else None,
-            "slug": slug or "unknown",
-            "product_id": (link.get("product_id") if link else product_id) or "unknown",
-            "platform": platform.lower(),
+            "slug": target_slug or "unknown",
+            "product_id": resolved_product,
+            "platform": norm_platform,
             "device_id": device_id,
             "install_referrer": install_referrer,
             "version": version or "1.0.0",
             "ip": ip,
+            "user_id": user_id,
             "timestamp": now,
             "attributed": bool(link),
             "attribution_method": attribution_method,
         }
         db.marketing_installs.insert_one(install_doc)
 
+        curr_total = 0
+        curr_android = 0
+        curr_ios = 0
         if link:
-            unique_devices = link.get("unique_devices", [])
-            is_unique = dev_key not in unique_devices
+            curr_total = int(link.get("total_downloads") or 0)
+            curr_android = int(link.get("android_downloads") or 0)
+            curr_ios = int(link.get("ios_downloads") or 0)
+            curr_unique = int(link.get("unique_installs") or 0)
+            raw_devices = link.get("unique_devices")
+            unique_devices = raw_devices if isinstance(raw_devices, list) else []
 
-            update_ops = {
-                "$inc": {"total_downloads": 1},
-                "$set": {"last_downloaded_at": now}
+            is_unique = dev_key not in unique_devices
+            new_total = curr_total + 1
+            new_android = curr_android + (1 if norm_platform == "android" else 0)
+            new_ios = curr_ios + (1 if norm_platform == "ios" else 0)
+            new_unique = curr_unique + (1 if is_unique else 0)
+
+            update_set = {
+                "total_downloads": new_total,
+                "android_downloads": new_android,
+                "ios_downloads": new_ios,
+                "unique_installs": new_unique,
+                "last_downloaded_at": now,
+                "updated_at": now
             }
-            if is_unique:
-                update_ops["$inc"]["unique_installs"] = 1
-                update_ops["$push"] = {"unique_devices": {"$each": [dev_key], "$slice": -5000}}
+            if not isinstance(raw_devices, list):
+                update_set["unique_devices"] = [dev_key]
+                update_ops = {"$set": update_set}
+            else:
+                update_ops = {"$set": update_set}
+                if is_unique:
+                    update_ops["$push"] = {"unique_devices": {"$each": [dev_key], "$slice": -5000}}
 
             db.marketing_links.update_one({"_id": link["_id"]}, update_ops)
 
+        # 5. Dual-write to central app_downloads collection for cross-tab consistency
+        try:
+            db["app_downloads"].insert_one({
+                "application_id": str(link["_id"]) if link else "marketing_attribution",
+                "app_code": resolved_product if resolved_product != "unknown" else "aisa",
+                "platform": norm_platform,
+                "version": version or "1.0.0",
+                "ip_country": "IN",
+                "user_id": user_id,
+                "created_at": now,
+            })
+        except Exception as e:
+            print(f"[MarketingService] app_downloads log notice: {e}")
+
         return {
             "success": True,
-            "slug": slug,
+            "slug": target_slug or "unknown",
             "attributed": bool(link),
             "attribution_method": attribution_method,
-            "product_id": link.get("product_id") if link else product_id
+            "product_id": resolved_product,
+            "platform": norm_platform,
+            "total_downloads": (curr_total + 1) if link else 0,
+            "android_downloads": (curr_android + (1 if norm_platform == "android" else 0)) if link else 0,
+            "ios_downloads": (curr_ios + (1 if norm_platform == "ios" else 0)) if link else 0
         }
 
     @staticmethod
@@ -484,6 +578,8 @@ class MarketingService:
         total_links = db.marketing_links.count_documents({})
         total_clicks = db.marketing_clicks.count_documents({})
         total_downloads = db.marketing_installs.count_documents({})
+        total_android_downloads = db.marketing_installs.count_documents({"platform": {"$in": ["android", "Android"]}})
+        total_ios_downloads = db.marketing_installs.count_documents({"platform": {"$in": ["ios", "iOS", "Ios"]}})
 
         # Unique reach across all clicks
         unique_reach = len(db.marketing_clicks.distinct("ip_hash"))
@@ -569,6 +665,12 @@ class MarketingService:
             "total_clicks": total_clicks,
             "unique_reach": unique_reach,
             "total_downloads": total_downloads,
+            "android_downloads": total_android_downloads,
+            "ios_downloads": total_ios_downloads,
+            "downloads_by_platform": {
+                "android": total_android_downloads,
+                "ios": total_ios_downloads,
+            },
             "overall_conversion_rate": overall_conversion_rate,
             "top_product": top_prod,
             "top_platform": top_plat,
@@ -608,9 +710,13 @@ class MarketingService:
         for inst in installs:
             inst["id"] = str(inst["_id"])
             inst["_id"] = str(inst["_id"])
+            inst["platform"] = (inst.get("platform") or "android").lower()
+            inst["attribution_method"] = inst.get("attribution_method") or "direct"
 
-        link["total_downloads"] = link.get("total_downloads", 0)
-        link["unique_installs"] = link.get("unique_installs", 0)
+        link["total_downloads"] = int(link.get("total_downloads") or 0)
+        link["android_downloads"] = int(link.get("android_downloads") or 0)
+        link["ios_downloads"] = int(link.get("ios_downloads") or 0)
+        link["unique_installs"] = int(link.get("unique_installs") or 0)
         total_c = link.get("total_clicks", 0)
         link["conversion_rate"] = round((link["total_downloads"] / total_c * 100), 1) if total_c > 0 else 0.0
 
@@ -642,3 +748,32 @@ class MarketingService:
         except Exception:
             pass
         return False
+
+    @staticmethod
+    def migrate_legacy_links() -> None:
+        """Ensure all marketing links have proper non-null numeric counters and arrays."""
+        try:
+            db = _get_db()
+            links = list(db.marketing_links.find({}))
+            for l in links:
+                updates = {}
+                if l.get("total_downloads") is None:
+                    updates["total_downloads"] = 0
+                if l.get("android_downloads") is None:
+                    updates["android_downloads"] = 0
+                if l.get("ios_downloads") is None:
+                    updates["ios_downloads"] = 0
+                if l.get("unique_installs") is None:
+                    updates["unique_installs"] = 0
+                if l.get("unique_devices") is None or not isinstance(l.get("unique_devices"), list):
+                    updates["unique_devices"] = []
+                if l.get("total_clicks") is None:
+                    updates["total_clicks"] = 0
+                if l.get("unique_clicks") is None:
+                    updates["unique_clicks"] = 0
+                if l.get("unique_ips") is None or not isinstance(l.get("unique_ips"), list):
+                    updates["unique_ips"] = []
+                if updates:
+                    db.marketing_links.update_one({"_id": l["_id"]}, {"$set": updates})
+        except Exception as e:
+            print(f"[MarketingService] Migration notice: {e}")

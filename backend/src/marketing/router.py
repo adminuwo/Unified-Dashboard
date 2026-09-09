@@ -22,8 +22,12 @@ def _get_base_url(request: Request) -> str:
     if settings.SHORT_LINK_BASE_URL:
         return settings.SHORT_LINK_BASE_URL.rstrip('/')
     proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-    host = request.headers.get("x-forwarded-host", request.headers.get("host", "localhost:8000"))
-    return f"{proto}://{host}"
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if host and "localhost" not in host and "127.0.0.1" not in host:
+        return f"{proto}://{host}"
+    if settings.BACKEND_URL and "localhost" not in settings.BACKEND_URL and "127.0.0.1" not in settings.BACKEND_URL:
+        return settings.BACKEND_URL.rstrip('/')
+    return f"{proto}://{host or 'localhost:8000'}"
 
 
 # ==============================================================================
@@ -152,24 +156,40 @@ async def public_redirector(slug: str, request: Request):
 # ==============================================================================
 # 🎯 4. Public Mobile App Install Telemetry Endpoints
 # ==============================================================================
-@router.post("/telemetry/install", summary="Record verified mobile app install from Google Play install referrer")
+@router.post("/telemetry/install", summary="Record verified mobile app install from Google Play install referrer or iOS attribution")
 async def track_app_install(payload: InstallTelemetryCreate, request: Request):
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "127.0.0.1")
     if "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
 
+    effective_ip = payload.ip or client_ip
+
     result = MarketingService.record_install(
         slug=payload.slug,
         product_id=payload.product_id,
+        app_code=payload.app_code,
+        referral_code=payload.referral_code,
+        ref_code=payload.ref_code,
         install_referrer=payload.install_referrer,
         platform=payload.platform,
         device_id=payload.device_id,
         version=payload.version,
-        ip=client_ip
+        ip=effective_ip,
+        user_id=payload.user_id
     )
     return result
 
 
+@router.post("/install", summary="Direct alias for app install telemetry")
+async def track_app_install_direct(payload: InstallTelemetryCreate, request: Request):
+    return await track_app_install(payload, request)
+
+
 @redirect_router.post("/api/marketing/telemetry/install", summary="Alias for app install telemetry")
 async def track_app_install_alias(payload: InstallTelemetryCreate, request: Request):
+    return await track_app_install(payload, request)
+
+
+@redirect_router.post("/api/marketing/install", summary="Root alias for app install telemetry")
+async def track_app_install_root_alias(payload: InstallTelemetryCreate, request: Request):
     return await track_app_install(payload, request)
