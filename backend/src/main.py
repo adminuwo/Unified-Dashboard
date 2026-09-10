@@ -110,6 +110,7 @@ DEFAULT_CORS_ORIGINS = [
     "https://www.yugamc.com",
     "https://uwoconnect.com",
     "https://www.uwoconnect.com",
+    "https://ai-ads-743928421487.asia-south1.run.app",
     "http://localhost:5173",
     "http://localhost:8080",
     "http://localhost:3000",
@@ -130,7 +131,7 @@ if configured_origins != ["*"]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=DEFAULT_CORS_ORIGINS,
-    allow_origin_regex=r"https?://(.*\.)?(uwo24\.com|aisa24\.com|aimall24\.com|efvframework\.com|yugamc\.com|uwoconnect\.com|localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"https?://(.*\.)?(uwo24\.com|aisa24\.com|aimall24\.com|efvframework\.com|yugamc\.com|uwoconnect\.com|run\.app|localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
