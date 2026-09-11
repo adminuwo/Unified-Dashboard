@@ -202,3 +202,43 @@ def test_react_native_play_install_referrer_payload(client):
     assert data["slug"] == slug
     assert data["attribution_method"] == "install_referrer"
     assert data["android_downloads"] >= 1
+
+
+def test_android_does_not_attribute_via_ip_match(client):
+    """Verify that Android strictly requires Google Play Install Referrer and rejects IP matching."""
+    # 1. Create Android link
+    data = MarketingLinkCreate(
+        product_id="aisa",
+        platform="youtube",
+        campaign_name="android_strict_google_api",
+        post_name="video_strict_test"
+    )
+    link = MarketingService.create_link(data, base_request_url="http://localhost:8000")
+    slug = link["slug"]
+
+    # 2. Simulate click from device IP
+    test_ip = "192.168.100.200"
+    MarketingService.record_click(
+        slug=slug,
+        ip=test_ip,
+        user_agent="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile",
+        referrer="https://youtube.com"
+    )
+
+    # 3. Simulate first launch of Android app from same IP WITHOUT Google Play referrer token
+    payload = {
+        "product_id": "aisa",
+        "platform": "android",
+        "device_id": "device_no_referrer_token",
+        "version": "1.0.0",
+        "ip": test_ip
+    }
+
+    res = client.post("/api/marketing/telemetry/install", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    # Must NOT attribute to the link because Android only accepts Google Play Install Referrer API
+    assert data["attributed"] is False
+    assert data["slug"] == "unknown"
+    assert data["attribution_method"] == "none"
+

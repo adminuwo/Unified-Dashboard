@@ -438,8 +438,10 @@ class MarketingService:
             if not link and target_slug.lower().startswith("ref-"):
                 link = db.marketing_links.find_one({"slug": {"$regex": f"^{re.escape(target_slug[4:])}$", "$options": "i"}})
 
-        # 3. Probabilistic Attribution (iOS / IP-Match): If slug is not yet found, match by client IP
-        if not link and ip:
+        # 3. Probabilistic Attribution (Strictly iOS only):
+        # Android strictly requires the official Google Play Install Referrer API.
+        # iOS has no install referrer API, so it uses 72-hour probabilistic IP matching.
+        if not link and ip and norm_platform == "ios":
             clean_ip = ip.strip()
             ip_hash = hashlib.sha256(clean_ip.encode()).hexdigest()[:16]
             time_window = now - timedelta(hours=72)
