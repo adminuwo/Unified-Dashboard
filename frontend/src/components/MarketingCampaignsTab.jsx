@@ -40,6 +40,7 @@ export const MarketingCampaignsTab = () => {
   const [testInstallModalLink, setTestInstallModalLink] = useState(null);
   const [installPlatform, setInstallPlatform] = useState('android');
   const [installDeviceId, setInstallDeviceId] = useState('');
+  const [installFingerprint, setInstallFingerprint] = useState('');
   const [installAppVersion, setInstallAppVersion] = useState('1.0.0');
   const [installClientIp, setInstallClientIp] = useState('127.0.0.1');
   const [installReferrerCustom, setInstallReferrerCustom] = useState('');
@@ -285,6 +286,7 @@ export const MarketingCampaignsTab = () => {
     setTestInstallModalLink(link);
     setInstallPlatform('android');
     setInstallDeviceId(`dev_test_${randomHex}`);
+    setInstallFingerprint(`fp_ios_${randomHex}`);
     setInstallAppVersion('1.0.0');
     setInstallClientIp('127.0.0.1');
     setInstallReferrerCustom(`utm_source=referral&slug=${link.slug}&utm_content=mobile`);
@@ -309,6 +311,10 @@ export const MarketingCampaignsTab = () => {
 
       if (installPlatform === 'android') {
         payload.install_referrer = installReferrerCustom || `utm_source=referral&slug=${testInstallModalLink.slug}`;
+      } else if (installPlatform === 'ios') {
+        if (installFingerprint && installFingerprint.trim()) {
+          payload.fingerprint = installFingerprint.trim();
+        }
       }
 
       const res = await fetch('/api/marketing/telemetry/install', {
@@ -2152,7 +2158,7 @@ export const MarketingCampaignsTab = () => {
                   </span>
                 ) : (
                   <span>
-                    <strong>iOS Attribution:</strong> Simulates iOS App launch telemetry with probabilistic IP matching and direct referral code attribution for <code>{testInstallModalLink.slug}</code>.
+                    <strong>iOS Attribution:</strong> Simulates iOS App launch telemetry with probabilistic IP matching and digital device fingerprint matching for <code>{testInstallModalLink.slug}</code>.
                   </span>
                 )}
               </div>
@@ -2229,28 +2235,53 @@ export const MarketingCampaignsTab = () => {
                 </div>
               )}
 
-              {/* iOS Specific: Client IP */}
+              {/* iOS Specific: Client IP & Digital Fingerprint */}
               {installPlatform === 'ios' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    Client IP Address (for IP Attribution Match)
-                  </label>
-                  <input
-                    type="text"
-                    value={installClientIp}
-                    onChange={(e) => setInstallClientIp(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      backgroundColor: '#1E293B',
-                      border: '1px solid #334155',
-                      borderRadius: '10px',
-                      color: '#FFFFFF',
-                      fontSize: '12px',
-                      fontFamily: 'monospace',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                      Client IP Address (for IP Match)
+                    </label>
+                    <input
+                      type="text"
+                      value={installClientIp}
+                      onChange={(e) => setInstallClientIp(e.target.value)}
+                      placeholder="e.g. 49.37.112.55"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        backgroundColor: '#1E293B',
+                        border: '1px solid #334155',
+                        borderRadius: '10px',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                      Digital Fingerprint (for FP Match)
+                    </label>
+                    <input
+                      type="text"
+                      value={installFingerprint}
+                      onChange={(e) => setInstallFingerprint(e.target.value)}
+                      placeholder="e.g. fp_ios_iphone_15_pro"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        backgroundColor: '#1E293B',
+                        border: '1px solid #334155',
+                        borderRadius: '10px',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 

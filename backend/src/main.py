@@ -34,6 +34,12 @@ async def lifespan(app: FastAPI):
     if not is_test:
         init_db()
         try:
+            from src.marketing.service import MarketingService
+            MarketingService.migrate_legacy_links()
+            MarketingService.reconcile_duplicate_installs()
+        except Exception as e:
+            print(f"[lifespan] Note: Marketing migration/reconciliation: {e}")
+        try:
             start_unified_analytics_scheduler()
         except Exception as e:
             print(f"[lifespan] Note: Unified analytics scheduler initialization: {e}")

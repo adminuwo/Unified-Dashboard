@@ -326,7 +326,24 @@ class MarketingService:
         return {"device": device, "os": os_name, "browser": browser}
 
     @staticmethod
-    def record_click(slug: str, ip: str, user_agent: str, referrer: Optional[str] = None) -> Optional[str]:
+    def generate_fingerprint(
+        ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        device: Optional[str] = None,
+        os: Optional[str] = None,
+    ) -> str:
+        """Generates a deterministic digital fingerprint from client signals."""
+        raw = f"{ip or ''}|{user_agent or ''}|{device or ''}|{os or ''}"
+        return f"fp_{hashlib.sha256(raw.encode()).hexdigest()[:20]}"
+
+    @staticmethod
+    def record_click(
+        slug: str,
+        ip: str,
+        user_agent: str,
+        referrer: Optional[str] = None,
+        fingerprint: Optional[str] = None,
+    ) -> Optional[str]:
         """Logs click telemetry asynchronously and returns destination URL for redirect."""
         db = _get_db()
         link = db.marketing_links.find_one({"slug": slug})
@@ -335,9 +352,19 @@ class MarketingService:
             return None
 
         now = datetime.now(timezone.utc)
-        ip_hash = hashlib.sha256((ip or "127.0.0.1").encode()).hexdigest()[:16]
+        clean_ip = (ip or "").strip()
+        ip_hash = hashlib.sha256((clean_ip or "127.0.0.1").encode()).hexdigest()[:16]
 
         ua_parsed = MarketingService.parse_user_agent(user_agent)
+
+        clean_fp = (fingerprint or "").strip()
+        if not clean_fp and (clean_ip or user_agent):
+            clean_fp = MarketingService.generate_fingerprint(
+                ip=clean_ip,
+                user_agent=user_agent,
+                device=ua_parsed.get("device"),
+                os=ua_parsed.get("os"),
+            )
 
         click_doc = {
             "link_id": str(link["_id"]),
@@ -347,8 +374,9 @@ class MarketingService:
             "campaign_name": link.get("campaign_name"),
             "post_name": link.get("post_name"),
             "timestamp": now,
-            "client_ip": ip,
+            "client_ip": clean_ip or None,
             "ip_hash": ip_hash,
+            "fingerprint": clean_fp or None,
             "user_agent": user_agent[:250] if user_agent else None,
             "device_type": ua_parsed["device"],
             "os": ua_parsed["os"],
@@ -398,9 +426,10 @@ class MarketingService:
         referral_code: Optional[str] = None,
         ref_code: Optional[str] = None,
         app_code: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        fingerprint: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Records verified app install telemetry from mobile app install referrer or iOS IP matching."""
+        """Records verified app install telemetry from mobile app install referrer or iOS IP/fingerprint matching."""
         db = _get_db()
         now = datetime.now(timezone.utc)
 
@@ -440,21 +469,15 @@ class MarketingService:
 
         # 3. Probabilistic Attribution (Strictly iOS only):
         # Android strictly requires the official Google Play Install Referrer API.
-        # iOS has no install referrer API, so it uses 72-hour probabilistic IP matching.
-        if not link and ip and norm_platform == "ios":
-            clean_ip = ip.strip()
-            ip_hash = hashlib.sha256(clean_ip.encode()).hexdigest()[:16]
+        # iOS has no install referrer API, so it uses 72-hour probabilistic IP and fingerprint matching.
+        clean_ip = (ip or "").strip()
+        clean_fp = (fingerprint or "").strip()
+
+        if not link and norm_platform == "ios" and (clean_ip or clean_fp):
+            ip_hash = hashlib.sha256(clean_ip.encode()).hexdigest()[:16] if clean_ip else ""
             time_window = now - timedelta(hours=72)
 
-            click_query: Dict[str, Any] = {
-                "$or": [
-                    {"client_ip": clean_ip},
-                    {"ip_hash": ip_hash}
-                ],
-                "timestamp": {"$gte": time_window}
-            }
-
-            candidate_click = None
+            prod_filter: Dict[str, Any] = {}
             if effective_product and effective_product not in ["unknown", "custom"]:
                 norm_pid = effective_product.replace("-", "").replace("_", "")
                 patterns = [effective_product, norm_pid]
@@ -462,52 +485,184 @@ class MarketingService:
                     patterns.extend(["ailegal", "ai-legal"])
                 elif norm_pid in ["aisa"]:
                     patterns.extend(["aisa"])
+                prod_filter = {"product_id": {"$in": list(set(patterns))}}
 
-                prod_query = dict(click_query)
-                prod_query["product_id"] = {"$in": list(set(patterns))}
-                candidate_click = db.marketing_clicks.find_one(
-                    prod_query,
-                    sort=[("timestamp", -1)]
-                )
+            candidate_click = None
+            matched_method = None
 
-            if not candidate_click:
-                # Fallback to any recent mobile/OS click from this IP
-                os_query = dict(click_query)
-                if norm_platform == "ios":
-                    os_query["$or"] = [
-                        {"os": {"$in": ["iOS", "ios"]}},
-                        {"device_type": "Mobile"},
+            # Priority 1: Both IP and Fingerprint match
+            if clean_ip and clean_fp:
+                both_query: Dict[str, Any] = {
+                    "$and": [
+                        {"$or": [{"client_ip": clean_ip}, {"ip_hash": ip_hash}]},
+                        {"fingerprint": clean_fp}
+                    ],
+                    "timestamp": {"$gte": time_window},
+                    **prod_filter
+                }
+                candidate_click = db.marketing_clicks.find_one(both_query, sort=[("timestamp", -1)])
+                if not candidate_click and prod_filter:
+                    # Fallback without product filter
+                    both_query_gen = {
+                        "$and": [
+                            {"$or": [{"client_ip": clean_ip}, {"ip_hash": ip_hash}]},
+                            {"fingerprint": clean_fp}
+                        ],
+                        "timestamp": {"$gte": time_window}
+                    }
+                    candidate_click = db.marketing_clicks.find_one(both_query_gen, sort=[("timestamp", -1)])
+                if candidate_click:
+                    matched_method = "ip_fingerprint_match"
+
+            # Priority 2: Fingerprint alone matches (e.g. user rotated network/Wi-Fi after click)
+            if not candidate_click and clean_fp:
+                fp_query: Dict[str, Any] = {
+                    "fingerprint": clean_fp,
+                    "timestamp": {"$gte": time_window},
+                    **prod_filter
+                }
+                candidate_click = db.marketing_clicks.find_one(fp_query, sort=[("timestamp", -1)])
+                if not candidate_click and prod_filter:
+                    fp_query_gen = {
+                        "fingerprint": clean_fp,
+                        "timestamp": {"$gte": time_window}
+                    }
+                    candidate_click = db.marketing_clicks.find_one(fp_query_gen, sort=[("timestamp", -1)])
+                if candidate_click:
+                    matched_method = "fingerprint_match"
+
+            # Priority 3: IP alone matches (e.g. fingerprint not provided or changed)
+            if not candidate_click and clean_ip:
+                ip_query: Dict[str, Any] = {
+                    "$or": [
                         {"client_ip": clean_ip},
                         {"ip_hash": ip_hash}
-                    ]
-                candidate_click = db.marketing_clicks.find_one(
-                    os_query,
-                    sort=[("timestamp", -1)]
-                )
+                    ],
+                    "timestamp": {"$gte": time_window},
+                    **prod_filter
+                }
+                candidate_click = db.marketing_clicks.find_one(ip_query, sort=[("timestamp", -1)])
+                if not candidate_click:
+                    # Fallback to any recent mobile/OS click from this IP
+                    os_query = {
+                        "$or": [
+                            {"os": {"$in": ["iOS", "ios"]}},
+                            {"device_type": "Mobile"},
+                            {"client_ip": clean_ip},
+                            {"ip_hash": ip_hash}
+                        ],
+                        "timestamp": {"$gte": time_window}
+                    }
+                    candidate_click = db.marketing_clicks.find_one(os_query, sort=[("timestamp", -1)])
+                if candidate_click:
+                    matched_method = "ip_match"
 
             if candidate_click and candidate_click.get("slug"):
                 found_slug = candidate_click["slug"]
                 link = db.marketing_links.find_one({"slug": found_slug})
                 if link:
                     target_slug = found_slug
-                    attribution_method = "ip_match"
+                    attribution_method = matched_method or "ip_match"
 
-        dev_key = device_id or (f"{ip}_{norm_platform}" if ip else str(uuid.uuid4()))
+        dev_key = device_id or clean_fp or (f"{clean_ip}_{norm_platform}" if clean_ip else str(uuid.uuid4()))
         resolved_product = (link.get("product_id") if link else effective_product) or "unknown"
+        link_id_str = str(link["_id"]) if link else None
+        clean_device = (device_id or "").strip()
+
+        # Multi-Tier Deduplication & Reinstall Detection
+        is_reinstall = False
+        duplicate_reason = None
+        matched_previous_id = None
+
+        # Check 1: Explicit Device ID match
+        if clean_device and clean_device not in ["unknown", "undefined", "null"]:
+            if link and clean_device in (link.get("unique_devices") or []):
+                is_reinstall = True
+                duplicate_reason = "device_id_in_link"
+            else:
+                q: Dict[str, Any] = {"device_id": clean_device}
+                if link_id_str:
+                    q["$or"] = [{"link_id": link_id_str}, {"slug": target_slug}, {"product_id": resolved_product}]
+                else:
+                    q["product_id"] = resolved_product
+                prev = db.marketing_installs.find_one(q, sort=[("timestamp", -1)])
+                if prev:
+                    is_reinstall = True
+                    duplicate_reason = "device_id_match"
+                    matched_previous_id = str(prev.get("_id"))
+
+        # Check 2: Device Fingerprint match
+        if not is_reinstall and clean_fp and clean_fp not in ["unknown", "undefined", "null"]:
+            if link and clean_fp in (link.get("unique_fingerprints") or []):
+                is_reinstall = True
+                duplicate_reason = "fingerprint_in_link"
+            else:
+                q_fp: Dict[str, Any] = {"fingerprint": clean_fp}
+                if link_id_str:
+                    q_fp["$or"] = [{"link_id": link_id_str}, {"slug": target_slug}, {"product_id": resolved_product}]
+                else:
+                    q_fp["product_id"] = resolved_product
+                prev = db.marketing_installs.find_one(q_fp, sort=[("timestamp", -1)])
+                if prev:
+                    is_reinstall = True
+                    duplicate_reason = "fingerprint_match"
+                    matched_previous_id = str(prev.get("_id"))
+
+        # Check 3: Authenticated User ID match
+        if not is_reinstall and user_id and str(user_id).strip() not in ["", "none", "null"]:
+            prev = db.marketing_installs.find_one({"user_id": str(user_id).strip(), "product_id": resolved_product})
+            if prev:
+                is_reinstall = True
+                duplicate_reason = "user_id_match"
+                matched_previous_id = str(prev.get("_id"))
+
+        # Check 4: IP + Referral Link / Product Heuristic
+        # Detects uninstalls and reinstalls where client device_id generated a new ephemeral UUID (dev_...)
+        if not is_reinstall and clean_ip and clean_ip not in ["127.0.0.1", "localhost"]:
+            ip_query: Dict[str, Any] = {
+                "ip": clean_ip,
+                "platform": norm_platform,
+            }
+            if link_id_str:
+                ip_query["$or"] = [{"link_id": link_id_str}, {"slug": target_slug}]
+            else:
+                ip_query["product_id"] = resolved_product
+
+            prev = db.marketing_installs.find_one(ip_query, sort=[("timestamp", -1)])
+            if prev:
+                prev_dev = prev.get("device_id") or ""
+                # If both have verified distinct hardware IDs (android_... or idfv_), they are separate devices on the same Wi-Fi.
+                # If either has an ephemeral dev_ prefix or matching ID or missing, it is a reinstall.
+                is_both_distinct_hardware = (
+                    clean_device.startswith("android_") and prev_dev.startswith("android_") and clean_device != prev_dev
+                ) or (
+                    clean_device.startswith("idfv_") and prev_dev.startswith("idfv_") and clean_device != prev_dev
+                )
+                if not is_both_distinct_hardware:
+                    is_reinstall = True
+                    duplicate_reason = "ip_referral_reinstall_heuristic"
+                    matched_previous_id = str(prev.get("_id"))
+
+        is_unique = not is_reinstall
 
         install_doc = {
-            "link_id": str(link["_id"]) if link else None,
+            "link_id": link_id_str,
             "slug": target_slug or "unknown",
             "product_id": resolved_product,
             "platform": norm_platform,
-            "device_id": device_id,
+            "device_id": clean_device or None,
+            "fingerprint": clean_fp or None,
             "install_referrer": install_referrer,
             "version": version or "1.0.0",
-            "ip": ip,
+            "ip": clean_ip or None,
             "user_id": user_id,
             "timestamp": now,
             "attributed": bool(link),
             "attribution_method": attribution_method,
+            "is_unique": is_unique,
+            "is_reinstall": is_reinstall,
+            "duplicate_reason": duplicate_reason,
+            "reinstall_of": matched_previous_id,
         }
         db.marketing_installs.insert_one(install_doc)
 
@@ -521,44 +676,66 @@ class MarketingService:
             curr_unique = int(link.get("unique_installs") or 0)
             raw_devices = link.get("unique_devices")
             unique_devices = raw_devices if isinstance(raw_devices, list) else []
+            raw_fps = link.get("unique_fingerprints")
+            unique_fps = raw_fps if isinstance(raw_fps, list) else []
 
-            is_unique = dev_key not in unique_devices
-            new_total = curr_total + 1
-            new_android = curr_android + (1 if norm_platform == "android" else 0)
-            new_ios = curr_ios + (1 if norm_platform == "ios" else 0)
-            new_unique = curr_unique + (1 if is_unique else 0)
+            if is_unique:
+                new_total = curr_total + 1
+                new_android = curr_android + (1 if norm_platform == "android" else 0)
+                new_ios = curr_ios + (1 if norm_platform == "ios" else 0)
+                new_unique = curr_unique + 1
+            else:
+                # Reinstall: Do NOT increment download counters
+                new_total = curr_total
+                new_android = curr_android
+                new_ios = curr_ios
+                new_unique = curr_unique
 
             update_set = {
                 "total_downloads": new_total,
                 "android_downloads": new_android,
                 "ios_downloads": new_ios,
                 "unique_installs": new_unique,
-                "last_downloaded_at": now,
+                "last_downloaded_at": now if is_unique else link.get("last_downloaded_at", now),
+                "last_reinstall_at": now if is_reinstall else link.get("last_reinstall_at"),
                 "updated_at": now
             }
-            if not isinstance(raw_devices, list):
-                update_set["unique_devices"] = [dev_key]
-                update_ops = {"$set": update_set}
-            else:
-                update_ops = {"$set": update_set}
-                if is_unique:
-                    update_ops["$push"] = {"unique_devices": {"$each": [dev_key], "$slice": -5000}}
+            store_key = clean_device or clean_fp or dev_key
+            push_ops: Dict[str, Any] = {}
+            if is_unique:
+                if not isinstance(raw_devices, list):
+                    update_set["unique_devices"] = [store_key] if store_key else []
+                elif store_key and store_key not in unique_devices:
+                    push_ops["unique_devices"] = {"$each": [store_key], "$slice": -5000}
+
+                if not isinstance(raw_fps, list):
+                    update_set["unique_fingerprints"] = [clean_fp] if clean_fp else []
+                elif clean_fp and clean_fp not in unique_fps:
+                    push_ops["unique_fingerprints"] = {"$each": [clean_fp], "$slice": -5000}
+
+            update_ops: Dict[str, Any] = {"$set": update_set}
+            if push_ops:
+                update_ops["$push"] = push_ops
 
             db.marketing_links.update_one({"_id": link["_id"]}, update_ops)
 
-        # 5. Dual-write to central app_downloads collection for cross-tab consistency
-        try:
-            db["app_downloads"].insert_one({
-                "application_id": str(link["_id"]) if link else "marketing_attribution",
-                "app_code": resolved_product if resolved_product != "unknown" else "aisa",
-                "platform": norm_platform,
-                "version": version or "1.0.0",
-                "ip_country": "IN",
-                "user_id": user_id,
-                "created_at": now,
-            })
-        except Exception as e:
-            print(f"[MarketingService] app_downloads log notice: {e}")
+        # 5. Dual-write to central app_downloads collection ONLY if unique
+        if is_unique:
+            try:
+                db["app_downloads"].insert_one({
+                    "application_id": link_id_str or "marketing_attribution",
+                    "app_code": resolved_product if resolved_product != "unknown" else "aisa",
+                    "platform": norm_platform,
+                    "version": version or "1.0.0",
+                    "ip_country": "IN",
+                    "ip": clean_ip or None,
+                    "fingerprint": clean_fp or None,
+                    "attribution_method": attribution_method,
+                    "user_id": user_id,
+                    "created_at": now,
+                })
+            except Exception as e:
+                print(f"[MarketingService] app_downloads log notice: {e}")
 
         return {
             "success": True,
@@ -567,9 +744,12 @@ class MarketingService:
             "attribution_method": attribution_method,
             "product_id": resolved_product,
             "platform": norm_platform,
-            "total_downloads": (curr_total + 1) if link else 0,
-            "android_downloads": (curr_android + (1 if norm_platform == "android" else 0)) if link else 0,
-            "ios_downloads": (curr_ios + (1 if norm_platform == "ios" else 0)) if link else 0
+            "fingerprint": clean_fp or None,
+            "is_unique": is_unique,
+            "is_reinstall": is_reinstall,
+            "total_downloads": new_total if link else (1 if is_unique else 0),
+            "android_downloads": new_android if link else (1 if is_unique and norm_platform == "android" else 0),
+            "ios_downloads": new_ios if link else (1 if is_unique and norm_platform == "ios" else 0),
         }
 
     @staticmethod
@@ -577,11 +757,18 @@ class MarketingService:
         """Returns overall marketing KPI cards, top performing posts, and platform distribution."""
         db = _get_db()
 
+        unique_filter = {"is_reinstall": {"$ne": True}}
         total_links = db.marketing_links.count_documents({})
         total_clicks = db.marketing_clicks.count_documents({})
-        total_downloads = db.marketing_installs.count_documents({})
-        total_android_downloads = db.marketing_installs.count_documents({"platform": {"$in": ["android", "Android"]}})
-        total_ios_downloads = db.marketing_installs.count_documents({"platform": {"$in": ["ios", "iOS", "Ios"]}})
+        total_downloads = db.marketing_installs.count_documents(unique_filter)
+        total_android_downloads = db.marketing_installs.count_documents({
+            **unique_filter,
+            "platform": {"$in": ["android", "Android"]}
+        })
+        total_ios_downloads = db.marketing_installs.count_documents({
+            **unique_filter,
+            "platform": {"$in": ["ios", "iOS", "Ios"]}
+        })
 
         # Unique reach across all clicks
         unique_reach = len(db.marketing_clicks.distinct("ip_hash"))
@@ -714,6 +901,8 @@ class MarketingService:
             inst["_id"] = str(inst["_id"])
             inst["platform"] = (inst.get("platform") or "android").lower()
             inst["attribution_method"] = inst.get("attribution_method") or "direct"
+            inst["is_unique"] = inst.get("is_unique", True)
+            inst["is_reinstall"] = inst.get("is_reinstall", False)
 
         link["total_downloads"] = int(link.get("total_downloads") or 0)
         link["android_downloads"] = int(link.get("android_downloads") or 0)
@@ -779,3 +968,89 @@ class MarketingService:
                     db.marketing_links.update_one({"_id": l["_id"]}, {"$set": updates})
         except Exception as e:
             print(f"[MarketingService] Migration notice: {e}")
+
+    @staticmethod
+    def reconcile_duplicate_installs() -> Dict[str, Any]:
+        """Scans marketing_installs and marketing_links to deduplicate any reinstall records and reconcile counters."""
+        db = _get_db()
+        reconciled_links = 0
+        marked_duplicates = 0
+
+        try:
+            links = list(db.marketing_links.find({}))
+            for link in links:
+                slug = link.get("slug")
+                link_id = str(link["_id"])
+
+                installs = list(db.marketing_installs.find({
+                    "$or": [{"link_id": link_id}, {"slug": slug}]
+                }).sort("timestamp", 1))
+
+                seen_devices = set()
+                seen_ips = set()
+                seen_fps = set()
+                unique_android = 0
+                unique_ios = 0
+                link_unique_devices = []
+
+                for inst in installs:
+                    dev = (inst.get("device_id") or "").strip()
+                    ip = (inst.get("ip") or "").strip()
+                    fp = (inst.get("fingerprint") or "").strip()
+                    platform = (inst.get("platform") or "android").lower()
+
+                    is_dup = False
+                    dup_reason = None
+
+                    if dev and dev in seen_devices:
+                        is_dup = True
+                        dup_reason = "reconcile_device_id"
+                    elif fp and fp in seen_fps:
+                        is_dup = True
+                        dup_reason = "reconcile_fingerprint"
+                    elif ip and ip not in ["127.0.0.1", "localhost"] and (ip, platform) in seen_ips:
+                        is_dup = True
+                        dup_reason = "reconcile_ip_platform"
+
+                    if is_dup:
+                        marked_duplicates += 1
+                        db.marketing_installs.update_one(
+                            {"_id": inst["_id"]},
+                            {"$set": {"is_unique": False, "is_reinstall": True, "duplicate_reason": dup_reason}}
+                        )
+                    else:
+                        db.marketing_installs.update_one(
+                            {"_id": inst["_id"]},
+                            {"$set": {"is_unique": True, "is_reinstall": False}}
+                        )
+                        if dev:
+                            seen_devices.add(dev)
+                            link_unique_devices.append(dev)
+                        if fp:
+                            seen_fps.add(fp)
+                        if ip:
+                            seen_ips.add((ip, platform))
+                        if "ios" in platform:
+                            unique_ios += 1
+                        else:
+                            unique_android += 1
+
+                total_u = unique_android + unique_ios
+                db.marketing_links.update_one(
+                    {"_id": link["_id"]},
+                    {"$set": {
+                        "total_downloads": total_u,
+                        "android_downloads": unique_android,
+                        "ios_downloads": unique_ios,
+                        "unique_installs": total_u,
+                        "unique_devices": link_unique_devices[:5000],
+                        "updated_at": datetime.now(timezone.utc)
+                    }}
+                )
+                reconciled_links += 1
+
+        except Exception as e:
+            print(f"[MarketingService] reconcile_duplicate_installs notice: {e}")
+
+        return {"reconciled_links": reconciled_links, "marked_duplicates": marked_duplicates}
+

@@ -131,19 +131,26 @@ async def delete_marketing_link(
 # 🚀 3. Public High-Speed Telemetry Redirector Endpoint (/r/{slug})
 # ==============================================================================
 @redirect_router.get("/r/{slug}", summary="Public redirection endpoint that logs telemetry and redirects")
-async def public_redirector(slug: str, request: Request):
+async def public_redirector(
+    slug: str,
+    request: Request,
+    fp: Optional[str] = Query(None, description="Client digital fingerprint"),
+    fingerprint: Optional[str] = Query(None, description="Client digital fingerprint alias")
+):
     client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "127.0.0.1")
     if "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
 
     user_agent = request.headers.get("user-agent", "")
     referrer = request.headers.get("referer", request.headers.get("referrer", ""))
+    client_fingerprint = fp or fingerprint or request.headers.get("x-fingerprint") or request.headers.get("x-client-fingerprint") or request.headers.get("x-device-fingerprint")
 
     dest_url = MarketingService.record_click(
         slug=slug,
         ip=client_ip,
         user_agent=user_agent,
-        referrer=referrer
+        referrer=referrer,
+        fingerprint=client_fingerprint
     )
 
     if not dest_url:
@@ -163,6 +170,7 @@ async def track_app_install(payload: InstallTelemetryCreate, request: Request):
         client_ip = client_ip.split(",")[0].strip()
 
     effective_ip = payload.ip or client_ip
+    effective_fingerprint = payload.effective_fingerprint or request.headers.get("x-fingerprint") or request.headers.get("x-client-fingerprint") or request.headers.get("x-device-fingerprint")
 
     result = MarketingService.record_install(
         slug=payload.slug,
@@ -175,7 +183,8 @@ async def track_app_install(payload: InstallTelemetryCreate, request: Request):
         device_id=payload.device_id,
         version=payload.version,
         ip=effective_ip,
-        user_id=payload.user_id
+        user_id=payload.user_id,
+        fingerprint=effective_fingerprint
     )
     return result
 

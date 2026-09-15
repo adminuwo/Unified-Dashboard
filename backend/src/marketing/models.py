@@ -65,6 +65,8 @@ class InstallTelemetryCreate(BaseModel):
     installTimestamp: Optional[int] = Field(None, description="Install begin timestamp alias")
     platform: str = Field("android", description="Mobile OS platform: android or ios")
     device_id: Optional[str] = Field(None, description="Unique client device fingerprint or UUID")
+    fingerprint: Optional[str] = Field(None, description="Digital device/browser fingerprint for iOS download attribution")
+    device_fingerprint: Optional[str] = Field(None, description="Device fingerprint alias for iOS download attribution")
     version: Optional[str] = Field("1.0.0", description="Installed app version")
     ip: Optional[str] = Field(None, description="Explicit client IP if provided")
     user_id: Optional[str] = Field(None, description="Authenticated user ID if available")
@@ -78,11 +80,16 @@ class InstallTelemetryCreate(BaseModel):
     def effective_install_referrer(self) -> Optional[str]:
         return self.install_referrer or self.installReferrer
 
+    @property
+    def effective_fingerprint(self) -> Optional[str]:
+        return self.fingerprint or self.device_fingerprint
+
 
 class ClickTelemetry(BaseModel):
     slug: str
     timestamp: datetime
     ip_hash: str
+    fingerprint: Optional[str] = None
     user_agent: Optional[str] = None
     device_type: str = "Desktop"  # Mobile, Desktop, Tablet, Bot
     browser: str = "Unknown"

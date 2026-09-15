@@ -242,3 +242,267 @@ def test_android_does_not_attribute_via_ip_match(client):
     assert data["slug"] == "unknown"
     assert data["attribution_method"] == "none"
 
+
+def test_ios_ip_and_fingerprint_matching_attribution(client):
+    """Verify that iOS installations attribute with high confidence when both IP and fingerprint match."""
+    # 1. Create iOS link
+    data = MarketingLinkCreate(
+        product_id="aisa",
+        platform="instagram",
+        campaign_name="ios_fp_campaign",
+        post_name="ios_fp_story",
+        custom_target_url="https://apps.apple.com/app/id6779135418"
+    )
+    link = MarketingService.create_link(data, base_request_url="http://localhost:8000")
+    slug = link["slug"]
+
+    test_ip = "49.37.112.55"
+    test_fp = "fp_ios_iphone_15_pro_abc123"
+
+    # 2. Simulate click passing fingerprint and IP
+    MarketingService.record_click(
+        slug=slug,
+        ip=test_ip,
+        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15",
+        referrer="https://instagram.com",
+        fingerprint=test_fp
+    )
+
+    # 3. Simulate first launch of iOS app with both matching IP and fingerprint
+    payload = {
+        "product_id": "aisa",
+        "platform": "ios",
+        "device_id": "ios_device_uuid_999",
+        "fingerprint": test_fp,
+        "version": "1.0.8",
+        "ip": test_ip
+    }
+
+    res = client.post("/api/marketing/telemetry/install", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["attributed"] is True
+    assert data["slug"] == slug
+    assert data["attribution_method"] == "ip_fingerprint_match"
+    assert data["platform"] == "ios"
+    assert data["fingerprint"] == test_fp
+    assert data["ios_downloads"] >= 1
+
+
+def test_ios_fingerprint_only_matching_attribution(client):
+    """Verify that iOS installations attribute when user rotates network (IP changes) but device fingerprint matches."""
+    data = MarketingLinkCreate(
+        product_id="ailegal",
+        platform="twitter",
+        campaign_name="ios_network_hop_test",
+        post_name="ios_tweet_link",
+        custom_target_url="https://apps.apple.com/app/id6797449251"
+    )
+    link = MarketingService.create_link(data, base_request_url="http://localhost:8000")
+    slug = link["slug"]
+
+    click_ip = "122.161.45.10"       # Cellular IP on click
+    install_ip = "106.213.88.99"     # Home Wi-Fi IP on install
+    device_fp = "fp_ios_ipad_air_m2_xyz789"
+
+    # 1. Click on cellular
+    MarketingService.record_click(
+        slug=slug,
+        ip=click_ip,
+        user_agent="Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15",
+        referrer="https://t.co",
+        fingerprint=device_fp
+    )
+
+    # 2. Install / launch on home Wi-Fi with same device fingerprint
+    payload = {
+        "product_id": "ailegal",
+        "platform": "ios",
+        "device_id": "ipad_device_uuid_888",
+        "fingerprint": device_fp,
+        "version": "1.0.11",
+        "ip": install_ip
+    }
+
+    res = client.post("/api/marketing/telemetry/install", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["attributed"] is True
+    assert data["slug"] == slug
+    assert data["attribution_method"] == "fingerprint_match"
+    assert data["platform"] == "ios"
+    assert data["ios_downloads"] >= 1
+
+
+def test_android_rejects_fingerprint_matching(client):
+    """Verify that Android strictly rejects fingerprint matching and requires Google Play Install Referrer."""
+    data = MarketingLinkCreate(
+        product_id="aisa",
+        platform="linkedin",
+        campaign_name="android_reject_fp",
+        post_name="post_no_referrer"
+    )
+    link = MarketingService.create_link(data, base_request_url="http://localhost:8000")
+    slug = link["slug"]
+
+    test_ip = "115.98.220.10"
+    test_fp = "fp_android_samsung_s24"
+
+    # 1. Click
+    MarketingService.record_click(
+        slug=slug,
+        ip=test_ip,
+        user_agent="Mozilla/5.0 (Linux; Android 14; SM-S928B)",
+        referrer="https://linkedin.com",
+        fingerprint=test_fp
+    )
+
+    # 2. Launch with matching fingerprint and IP on Android without Google Play referrer token
+    payload = {
+        "product_id": "aisa",
+        "platform": "android",
+        "device_id": "android_dev_999",
+        "fingerprint": test_fp,
+        "version": "1.0.0",
+        "ip": test_ip
+    }
+
+    res = client.post("/api/marketing/telemetry/install", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    # Android MUST be rejected from probabilistic attribution
+    assert data["attributed"] is False
+    assert data["slug"] == "unknown"
+    assert data["attribution_method"] == "none"
+
+
+def test_reinstall_same_device_id_does_not_increment_downloads(client):
+    """Verify that reinstalling from the same device does NOT increment the download counter."""
+    data = MarketingLinkCreate(
+        product_id="ailegal",
+        platform="instagram",
+        campaign_name="reinstall_prevention_test",
+        post_name="reinstall_post_1"
+    )
+    link = MarketingService.create_link(data)
+    slug = link["slug"]
+
+    # 1. First install
+    payload1 = {
+        "product_id": "ailegal",
+        "slug": slug,
+        "platform": "android",
+        "device_id": "android_9876543210abcdef",
+        "version": "1.0.12",
+        "ip": "115.111.45.20",
+        "install_referrer": f"utm_source=instagram&slug={slug}"
+    }
+    res1 = client.post("/api/marketing/telemetry/install", json=payload1)
+    assert res1.status_code == 200
+    d1 = res1.json()
+    assert d1["is_unique"] is True
+    assert d1["is_reinstall"] is False
+    assert d1["total_downloads"] == 1
+    assert d1["android_downloads"] == 1
+
+    # 2. Friend uninstalls and reinstalls through URL (same persistent Android ID)
+    res2 = client.post("/api/marketing/telemetry/install", json=payload1)
+    assert res2.status_code == 200
+    d2 = res2.json()
+    assert d2["is_unique"] is False
+    assert d2["is_reinstall"] is True
+    # Download counter MUST NOT increment
+    assert d2["total_downloads"] == 1
+    assert d2["android_downloads"] == 1
+
+
+def test_reinstall_after_uninstall_same_ip_and_slug_does_not_increment_downloads(client):
+    """Verify that even if client device_id resets to a new ephemeral dev_ UUID upon reinstall,
+    the backend heuristic detects matching IP + slug and prevents duplicate download counts."""
+    data = MarketingLinkCreate(
+        product_id="ailegal",
+        platform="whatsapp",
+        campaign_name="friend_referral",
+        post_name="chat_link"
+    )
+    link = MarketingService.create_link(data)
+    slug = link["slug"]
+    friend_ip = "152.59.30.184"
+
+    # 1. First install with ephemeral dev_ UUID
+    payload1 = {
+        "product_id": "ailegal",
+        "slug": slug,
+        "platform": "android",
+        "device_id": "dev_pyvu3ndkx7_1789386802567",
+        "version": "1.0.12",
+        "ip": friend_ip,
+        "install_referrer": f"utm_source=whatsapp&slug={slug}"
+    }
+    res1 = client.post("/api/marketing/telemetry/install", json=payload1)
+    assert res1.status_code == 200
+    d1 = res1.json()
+    assert d1["is_unique"] is True
+    assert d1["total_downloads"] == 1
+
+    # 2. Friend uninstalls, re-clicks link, reinstalls. App generates NEW ephemeral UUID
+    payload2 = {
+        "product_id": "ailegal",
+        "slug": slug,
+        "platform": "android",
+        "device_id": "dev_g4aw3xd6ii8_1789386850468",  # brand new random ID
+        "version": "1.0.12",
+        "ip": friend_ip,  # same friend IP
+        "install_referrer": f"utm_source=whatsapp&slug={slug}"
+    }
+    res2 = client.post("/api/marketing/telemetry/install", json=payload2)
+    assert res2.status_code == 200
+    d2 = res2.json()
+    # MUST be detected as a reinstall
+    assert d2["is_unique"] is False
+    assert d2["is_reinstall"] is True
+    assert d2["total_downloads"] == 1
+    assert d2["android_downloads"] == 1
+
+
+def test_distinct_devices_increment_download_counter(client):
+    """Verify that distinct real devices increment the download counter properly."""
+    data = MarketingLinkCreate(
+        product_id="aisa",
+        platform="youtube",
+        campaign_name="multi_device_test",
+        post_name="video_share"
+    )
+    link = MarketingService.create_link(data)
+    slug = link["slug"]
+
+    # User 1
+    p1 = {
+        "product_id": "aisa",
+        "slug": slug,
+        "platform": "android",
+        "device_id": "android_device_user_1",
+        "version": "1.0.0",
+        "ip": "49.36.1.1",
+        "install_referrer": f"utm_source=youtube&slug={slug}"
+    }
+    r1 = client.post("/api/marketing/telemetry/install", json=p1)
+    assert r1.json()["total_downloads"] == 1
+
+    # User 2 (different device)
+    p2 = {
+        "product_id": "aisa",
+        "slug": slug,
+        "platform": "android",
+        "device_id": "android_device_user_2",
+        "version": "1.0.0",
+        "ip": "49.36.2.2",
+        "install_referrer": f"utm_source=youtube&slug={slug}"
+    }
+    r2 = client.post("/api/marketing/telemetry/install", json=p2)
+    assert r2.json()["total_downloads"] == 2
+    assert r2.json()["is_unique"] is True
+
+
