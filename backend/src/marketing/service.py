@@ -188,6 +188,17 @@ class MarketingService:
             slug=slug
         )
 
+        # Pre-bake Google Play install referrer and UTM parameters into android_url for smart links
+        if is_smart and android_url and "play.google.com" in android_url:
+            android_url = MarketingService._build_full_utm_url(
+                base_url=android_url,
+                platform=data.platform,
+                campaign=data.campaign_name,
+                post_name=data.post_name,
+                channel_type=data.channel_type or "organic",
+                slug=slug
+            )
+
         now = datetime.now(timezone.utc)
         doc = {
             "slug": slug,
