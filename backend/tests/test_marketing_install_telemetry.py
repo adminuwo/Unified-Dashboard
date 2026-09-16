@@ -506,3 +506,41 @@ def test_distinct_devices_increment_download_counter(client):
     assert r2.json()["is_unique"] is True
 
 
+def test_smart_link_device_routing(client):
+    """Verify that a single smart link routes Android to Play Store, iOS to App Store, and Desktop to Web."""
+    # 1. Create Smart Link for AI Legal
+    data = MarketingLinkCreate(
+        product_id="ailegal",
+        platform="instagram",
+        campaign_name="smart_universal_campaign",
+        post_name="smart_bio_link",
+        is_smart_link=True,
+    )
+    link = MarketingService.create_link(data, base_request_url="http://localhost:8000")
+    slug = link["slug"]
+    assert link["is_smart_link"] is True
+
+    # 2. Android Device Click (follow_redirects=False to inspect 302 Location header)
+    android_ua = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+    res_android = client.get(f"/r/{slug}", headers={"User-Agent": android_ua}, follow_redirects=False)
+    assert res_android.status_code == 302
+    loc_android = res_android.headers["location"]
+    assert "play.google.com/store/apps/details?id=com.uwo.ailegal" in loc_android
+    assert f"slug%3D{slug}" in loc_android or f"slug={slug}" in loc_android
+
+    # 3. iOS Device Click
+    ios_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+    res_ios = client.get(f"/r/{slug}", headers={"User-Agent": ios_ua}, follow_redirects=False)
+    assert res_ios.status_code == 302
+    loc_ios = res_ios.headers["location"]
+    assert loc_ios == "https://apps.apple.com/app/id6797449251"
+
+    # 4. Desktop Device Click
+    desktop_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    res_desktop = client.get(f"/r/{slug}", headers={"User-Agent": desktop_ua}, follow_redirects=False)
+    assert res_desktop.status_code == 302
+    loc_desktop = res_desktop.headers["location"]
+    assert "https://ailegal.aisa24.com" in loc_desktop
+
+
+

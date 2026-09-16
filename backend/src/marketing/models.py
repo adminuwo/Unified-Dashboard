@@ -13,6 +13,10 @@ class MarketingLinkCreate(BaseModel):
     channel_type: Optional[str] = "organic"  # organic, paid_ad, influencer, partner, referral
     custom_slug: Optional[str] = None
     notes: Optional[str] = None
+    is_smart_link: Optional[bool] = False
+    android_url: Optional[str] = None
+    ios_url: Optional[str] = None
+    web_url: Optional[str] = None
 
 
 class BatchMarketingLinkCreate(BaseModel):
@@ -23,6 +27,10 @@ class BatchMarketingLinkCreate(BaseModel):
     platforms: List[str] = Field(..., min_items=1, description="List of platform IDs to generate links for")
     channel_type: Optional[str] = "organic"
     notes: Optional[str] = None
+    is_smart_link: Optional[bool] = False
+    android_url: Optional[str] = None
+    ios_url: Optional[str] = None
+    web_url: Optional[str] = None
 
 
 class MarketingLinkResponse(BaseModel):
@@ -45,6 +53,10 @@ class MarketingLinkResponse(BaseModel):
     unique_installs: int = 0
     conversion_rate: Optional[float] = 0.0
     is_active: bool = True
+    is_smart_link: Optional[bool] = False
+    android_url: Optional[str] = None
+    ios_url: Optional[str] = None
+    web_url: Optional[str] = None
     created_by: Optional[str] = "Admin"
     created_at: datetime
     updated_at: Optional[datetime] = None

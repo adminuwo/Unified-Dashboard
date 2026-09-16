@@ -21,6 +21,9 @@ PRODUCT_CATALOG: Dict[str, Dict[str, str]] = {
     "aisa": {
         "name": "AISA",
         "url": "https://aisa24.com",
+        "play_store_url": "https://play.google.com/store/apps/details?id=com.uwo.aisa",
+        "app_store_url": "https://apps.apple.com/app/id6779135418",
+        "web_url": "https://aisa24.com",
         "description": "Next-Gen Enterprise AI Models & Assistant Platform",
         "color": "#6366F1",
     },
@@ -39,6 +42,9 @@ PRODUCT_CATALOG: Dict[str, Dict[str, str]] = {
     "ailegal": {
         "name": "AI-Legal",
         "url": "https://ailegal.aisa24.com",
+        "play_store_url": "https://play.google.com/store/apps/details?id=com.uwo.ailegal",
+        "app_store_url": "https://apps.apple.com/app/id6797449251",
+        "web_url": "https://ailegal.aisa24.com",
         "description": "AI Legal Assistant & Advocates Practice Suite",
         "color": "#D4AF37",
     },
@@ -142,10 +148,23 @@ class MarketingService:
     def create_link(data: MarketingLinkCreate, base_request_url: str = "", creator: str = "Admin") -> Dict[str, Any]:
         db = _get_db()
 
-        # Resolve target base URL (ALWAYS honor custom_target_url if provided, e.g. Play Store URL)
         product_info = PRODUCT_CATALOG.get(data.product_id, PRODUCT_CATALOG["custom"])
-        if data.custom_target_url and data.custom_target_url.strip():
+
+        # Resolve smart link flags & platform URLs
+        is_smart = bool(
+            data.is_smart_link 
+            or (data.custom_target_url and "smart_app" in data.custom_target_url.lower())
+            or (data.android_url and data.ios_url)
+        )
+        android_url = (data.android_url or "").strip() or product_info.get("play_store_url")
+        ios_url = (data.ios_url or "").strip() or product_info.get("app_store_url")
+        web_url = (data.web_url or "").strip() or product_info.get("web_url") or product_info.get("url") or "https://aisa24.com"
+
+        # Resolve target base URL (ALWAYS honor custom_target_url if provided unless it is smart_app placeholder)
+        if data.custom_target_url and data.custom_target_url.strip() and data.custom_target_url.strip() != "smart_app":
             target_url = data.custom_target_url.strip()
+        elif is_smart and web_url:
+            target_url = web_url
         else:
             target_url = product_info.get("url") or "https://aisa24.com" 
 
@@ -181,6 +200,10 @@ class MarketingService:
             "post_name": data.post_name.strip(),
             "channel_type": data.channel_type or "organic",
             "notes": data.notes or "",
+            "is_smart_link": is_smart,
+            "android_url": android_url if is_smart else None,
+            "ios_url": ios_url if is_smart else None,
+            "web_url": web_url if is_smart else None,
             "total_clicks": 0,
             "unique_clicks": 0,
             "unique_ips": [],
@@ -218,6 +241,10 @@ class MarketingService:
                 post_name=data.post_name,
                 channel_type=data.channel_type,
                 notes=data.notes,
+                is_smart_link=data.is_smart_link,
+                android_url=data.android_url,
+                ios_url=data.ios_url,
+                web_url=data.web_url,
             )
             link_doc = MarketingService.create_link(single_item, base_request_url=base_request_url, creator=creator)
             created.append(link_doc)
@@ -409,9 +436,22 @@ class MarketingService:
             )
 
         dest_url = link.get("full_destination_url") or link.get("target_url")
+        if link.get("is_smart_link"):
+            os_name = (ua_parsed.get("os") or "").lower()
+            raw_ua = (user_agent or "").lower()
+            prod_info = PRODUCT_CATALOG.get(link.get("product_id"), {})
+
+            if "android" in os_name or "android" in raw_ua:
+                dest_url = link.get("android_url") or prod_info.get("play_store_url") or dest_url
+            elif "ios" in os_name or "iphone" in raw_ua or "ipad" in raw_ua:
+                dest_url = link.get("ios_url") or prod_info.get("app_store_url") or dest_url
+            else:
+                dest_url = link.get("web_url") or prod_info.get("web_url") or link.get("target_url") or dest_url
+
         if dest_url and "play.google.com" in dest_url and "referrer=" not in dest_url:
             sep = "&" if "?" in dest_url else "?"
-            dest_url = f"{dest_url}{sep}referrer=slug%3D{slug}%26utm_source%3Dcustom_referral"
+            platform_tag = link.get("platform") or "custom_referral"
+            dest_url = f"{dest_url}{sep}referrer=utm_source%3D{platform_tag}%26slug%3D{slug}%26ref%3D{slug}"
         return dest_url
 
     @staticmethod

@@ -17,6 +17,7 @@ export const MarketingCampaignsTab = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState('aisa');
   const [customTargetUrl, setCustomTargetUrl] = useState('');
+  const [isSmartLink, setIsSmartLink] = useState(false);
   const [campaignName, setCampaignName] = useState('');
   const [postName, setPostName] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram']);
@@ -133,14 +134,10 @@ export const MarketingCampaignsTab = () => {
 
   // Immediate refresh on window focus
   useEffect(() => {
-    const handleFocus = () => {
-      if (isLiveActive) {
-        fetchData(true);
-      }
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [isLiveActive, token]);
+    const onFocus = () => fetchData(true);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [token]);
 
   const getShortUrl = (linkObj) => {
     if (!linkObj) return '';
@@ -194,7 +191,8 @@ export const MarketingCampaignsTab = () => {
           headers,
           body: JSON.stringify({
             product_id: selectedProduct,
-            custom_target_url: customTargetUrl || undefined,
+            custom_target_url: customTargetUrl && customTargetUrl !== 'smart_app' ? customTargetUrl : undefined,
+            is_smart_link: isSmartLink,
             platform: selectedPlatforms[0],
             campaign_name: campaignName.trim(),
             post_name: postName.trim(),
@@ -211,7 +209,8 @@ export const MarketingCampaignsTab = () => {
           headers,
           body: JSON.stringify({
             product_id: selectedProduct,
-            custom_target_url: customTargetUrl || undefined,
+            custom_target_url: customTargetUrl && customTargetUrl !== 'smart_app' ? customTargetUrl : undefined,
+            is_smart_link: isSmartLink,
             campaign_name: campaignName.trim(),
             post_name: postName.trim(),
             platforms: selectedPlatforms,
@@ -950,7 +949,28 @@ export const MarketingCampaignsTab = () => {
                     >
                       {/* Post Name & Campaign */}
                       <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: '800', color: '#FFFFFF', fontSize: '14px' }}>{link.post_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <div style={{ fontWeight: '800', color: '#FFFFFF', fontSize: '14px' }}>{link.post_name}</div>
+                          {link.is_smart_link && (
+                            <span
+                              title="Smart Dual-Platform Link: Auto-routes Android to Play Store and iOS to App Store"
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                color: '#FBBF24',
+                                border: '1px solid rgba(245, 158, 11, 0.4)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                              }}
+                            >
+                              ⚡ Smart (Android + iOS)
+                            </span>
+                          )}
+                        </div>
                         <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>
                           Campaign: <span style={{ color: '#CBD5E1' }}>{link.campaign_name}</span>
                         </div>
@@ -1411,18 +1431,68 @@ export const MarketingCampaignsTab = () => {
                     <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase' }}>
                       App Store Presets:
                     </span>
+                    {/* ⚡ Smart Dual-Platform Presets */}
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedProduct('ailegal');
+                        setIsSmartLink(true);
+                        setCustomTargetUrl('smart_app');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: isSmartLink && selectedProduct === 'ailegal' ? 'rgba(245,158,11,0.25)' : '#1E293B',
+                        border: `1px solid ${isSmartLink && selectedProduct === 'ailegal' ? '#F59E0B' : '#475569'}`,
+                        color: isSmartLink && selectedProduct === 'ailegal' ? '#FCD34D' : '#FBBF24',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: isSmartLink && selectedProduct === 'ailegal' ? '0 0 12px rgba(245,158,11,0.3)' : 'none',
+                      }}
+                    >
+                      ⚡ AI Legal (Smart: Android + iOS)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('aisa');
+                        setIsSmartLink(true);
+                        setCustomTargetUrl('smart_app');
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: isSmartLink && selectedProduct === 'aisa' ? 'rgba(245,158,11,0.25)' : '#1E293B',
+                        border: `1px solid ${isSmartLink && selectedProduct === 'aisa' ? '#F59E0B' : '#475569'}`,
+                        color: isSmartLink && selectedProduct === 'aisa' ? '#FCD34D' : '#FBBF24',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: isSmartLink && selectedProduct === 'aisa' ? '0 0 12px rgba(245,158,11,0.3)' : 'none',
+                      }}
+                    >
+                      ⚡ AISA (Smart: Android + iOS)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct('ailegal');
+                        setIsSmartLink(false);
                         setCustomTargetUrl('https://play.google.com/store/apps/details?id=com.uwo.ailegal');
                       }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        backgroundColor: customTargetUrl.includes('com.uwo.ailegal') ? 'rgba(16,185,129,0.2)' : '#1E293B',
-                        border: `1px solid ${customTargetUrl.includes('com.uwo.ailegal') ? '#10B981' : '#334155'}`,
-                        color: customTargetUrl.includes('com.uwo.ailegal') ? '#34D399' : '#CBD5E1',
+                        backgroundColor: !isSmartLink && customTargetUrl.includes('com.uwo.ailegal') ? 'rgba(16,185,129,0.2)' : '#1E293B',
+                        border: `1px solid ${!isSmartLink && customTargetUrl.includes('com.uwo.ailegal') ? '#10B981' : '#334155'}`,
+                        color: !isSmartLink && customTargetUrl.includes('com.uwo.ailegal') ? '#34D399' : '#CBD5E1',
                         fontSize: '12px',
                         fontWeight: '700',
                         cursor: 'pointer',
@@ -1437,14 +1507,15 @@ export const MarketingCampaignsTab = () => {
                       type="button"
                       onClick={() => {
                         setSelectedProduct('aisa');
+                        setIsSmartLink(false);
                         setCustomTargetUrl('https://play.google.com/store/apps/details?id=com.uwo.aisa');
                       }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        backgroundColor: customTargetUrl.includes('com.uwo.aisa') ? 'rgba(16,185,129,0.2)' : '#1E293B',
-                        border: `1px solid ${customTargetUrl.includes('com.uwo.aisa') ? '#10B981' : '#334155'}`,
-                        color: customTargetUrl.includes('com.uwo.aisa') ? '#34D399' : '#CBD5E1',
+                        backgroundColor: !isSmartLink && customTargetUrl.includes('com.uwo.aisa') ? 'rgba(16,185,129,0.2)' : '#1E293B',
+                        border: `1px solid ${!isSmartLink && customTargetUrl.includes('com.uwo.aisa') ? '#10B981' : '#334155'}`,
+                        color: !isSmartLink && customTargetUrl.includes('com.uwo.aisa') ? '#34D399' : '#CBD5E1',
                         fontSize: '12px',
                         fontWeight: '700',
                         cursor: 'pointer',
@@ -1459,14 +1530,15 @@ export const MarketingCampaignsTab = () => {
                       type="button"
                       onClick={() => {
                         setSelectedProduct('ailegal');
+                        setIsSmartLink(false);
                         setCustomTargetUrl('https://apps.apple.com/app/id6797449251');
                       }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        backgroundColor: customTargetUrl.includes('id6797449251') ? 'rgba(59,130,246,0.2)' : '#1E293B',
-                        border: `1px solid ${customTargetUrl.includes('id6797449251') ? '#3B82F6' : '#334155'}`,
-                        color: customTargetUrl.includes('id6797449251') ? '#60A5FA' : '#CBD5E1',
+                        backgroundColor: !isSmartLink && customTargetUrl.includes('id6797449251') ? 'rgba(59,130,246,0.2)' : '#1E293B',
+                        border: `1px solid ${!isSmartLink && customTargetUrl.includes('id6797449251') ? '#3B82F6' : '#334155'}`,
+                        color: !isSmartLink && customTargetUrl.includes('id6797449251') ? '#60A5FA' : '#CBD5E1',
                         fontSize: '12px',
                         fontWeight: '700',
                         cursor: 'pointer',
@@ -1481,14 +1553,15 @@ export const MarketingCampaignsTab = () => {
                       type="button"
                       onClick={() => {
                         setSelectedProduct('aisa');
+                        setIsSmartLink(false);
                         setCustomTargetUrl('https://apps.apple.com/app/id6779135418');
                       }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        backgroundColor: customTargetUrl.includes('id6779135418') ? 'rgba(59,130,246,0.2)' : '#1E293B',
-                        border: `1px solid ${customTargetUrl.includes('id6779135418') ? '#3B82F6' : '#334155'}`,
-                        color: customTargetUrl.includes('id6779135418') ? '#60A5FA' : '#CBD5E1',
+                        backgroundColor: !isSmartLink && customTargetUrl.includes('id6779135418') ? 'rgba(59,130,246,0.2)' : '#1E293B',
+                        border: `1px solid ${!isSmartLink && customTargetUrl.includes('id6779135418') ? '#3B82F6' : '#334155'}`,
+                        color: !isSmartLink && customTargetUrl.includes('id6779135418') ? '#60A5FA' : '#CBD5E1',
                         fontSize: '12px',
                         fontWeight: '700',
                         cursor: 'pointer',
@@ -1502,7 +1575,10 @@ export const MarketingCampaignsTab = () => {
                     {customTargetUrl ? (
                       <button
                         type="button"
-                        onClick={() => setCustomTargetUrl('')}
+                        onClick={() => {
+                          setCustomTargetUrl('');
+                          setIsSmartLink(false);
+                        }}
                         style={{
                           padding: '6px 10px',
                           borderRadius: '8px',
@@ -1518,6 +1594,28 @@ export const MarketingCampaignsTab = () => {
                       </button>
                     ) : null}
                   </div>
+
+                  {isSmartLink && (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        color: '#FBBF24',
+                        fontSize: '12px',
+                        lineHeight: '1.5',
+                      }}
+                    >
+                      ⚡ <strong>Universal Smart Link Active:</strong> This single URL auto-detects each visitor's device in real time:
+                      <div style={{ marginTop: '6px', display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '11px', color: '#FDE68A' }}>
+                        <span>🤖 <strong>Android:</strong> Google Play Store (Attributed with install referrer)</span>
+                        <span>🍏 <strong>iOS:</strong> Apple App Store (Attributed with 72h window)</span>
+                        <span>💻 <strong>PC / Desktop:</strong> Web Application</span>
+                      </div>
+                    </div>
+                  )}
 
                   {customTargetUrl.includes('play.google.com') && (
                     <div
@@ -1841,6 +1939,21 @@ export const MarketingCampaignsTab = () => {
                 <span style={{ color: '#94A3B8', fontSize: '12px' }}>
                   Platform: {detailsModalLink.link?.platform} | Product: {detailsModalLink.link?.product_name}
                 </span>
+                {detailsModalLink.link?.is_smart_link && (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      color: '#FBBF24',
+                      fontSize: '11px',
+                    }}
+                  >
+                    ⚡ <strong>Smart Dual-Link:</strong> Auto-routes 🤖 Android to Google Play, 🍏 iOS to Apple App Store, and 💻 PC to Web App.
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setDetailsModalLink(null)}
