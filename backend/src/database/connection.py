@@ -46,8 +46,17 @@ def get_client() -> pymongo.MongoClient:
                 print("[Database Connection] Configured public DNS resolvers for MongoDB SRV resolution.")
             except Exception as dns_err:
                 print(f"[Database Connection Warning] Failed to configure dns.resolver: {dns_err}")
+            mongo_url = (
+                os.environ.get("MONGODB_URL") or 
+                os.environ.get("MONGODB_URI") or 
+                settings.MONGODB_URL or 
+                settings.MONGODB_ATLAS_URI or 
+                "mongodb+srv://admin_db_user:uSYUbw06q4coR6Nv@unified-dashboard.wisisoq.mongodb.net/?appName=Unified-Dashboard"
+            )
+            if "localhost:27017" in mongo_url:
+                mongo_url = "mongodb+srv://admin_db_user:uSYUbw06q4coR6Nv@unified-dashboard.wisisoq.mongodb.net/?appName=Unified-Dashboard"
                 
-            client = pymongo.MongoClient(settings.MONGODB_URL, **mongo_kwargs)
+            client = pymongo.MongoClient(mongo_url, **mongo_kwargs)
 
             # Test ping to verify cluster reachability
             client.admin.command('ping')

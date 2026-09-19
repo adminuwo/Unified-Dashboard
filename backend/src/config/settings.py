@@ -8,10 +8,12 @@ class Settings(BaseSettings):
     PORT: int = 8000
     ALLOWED_ORIGINS: str = "*"
 
-    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_URL: str = "mongodb+srv://admin_db_user:uSYUbw06q4coR6Nv@unified-dashboard.wisisoq.mongodb.net/?appName=Unified-Dashboard"
     MONGODB_DB_NAME: str = "unified_service_db"
-    MONGODB_ATLAS_URI: str | None = None
+    MONGODB_ATLAS_URI: str | None = "mongodb+srv://admin_db_user:uSYUbw06q4coR6Nv@unified-dashboard.wisisoq.mongodb.net/?appName=Unified-Dashboard"
     AI_LEGAL_MONGODB_URI: str | None = None
+    UWO_MONGODB_URI: str | None = "mongodb+srv://uwo_admin:uwo%4012345@cluster0.selr4is.mongodb.net/UWO-web?retryWrites=true&w=majority"
+    UWO_MONGODB_DB_NAME: str = "UWO-web"
 
     JWT_SECRET: str = "super-secret-jwt-key-change-this-in-production-32-bytes"
     JWT_ALGORITHM: str = "HS256"
