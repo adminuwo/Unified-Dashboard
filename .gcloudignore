@@ -4,8 +4,8 @@
 .gitignore
 .github
 
-# Exclude local dependencies
-backend/.venv/
+# Exclude backend (migrated to Service 1 UWO-B)
+backend/
 **/node_modules/
 frontend/dist/
 
