@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getApiUrl } from '../config/api';
 
 export const UWOLoginModal = ({ isOpen, onClose, onSuccess, appCode = "aisa", apiKey = "key_aisa_live_master_2026" }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -22,7 +21,7 @@ export const UWOLoginModal = ({ isOpen, onClose, onSuccess, appCode = "aisa", ap
     try {
       if (isRegisterMode) {
         // 1. Register new central account
-        const regRes = await fetch(getApiUrl('/api/auth/register'), {
+        const regRes = await fetch('http://localhost:8000/api/auth/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -40,7 +39,7 @@ export const UWOLoginModal = ({ isOpen, onClose, onSuccess, appCode = "aisa", ap
       }
 
       // 2. Authenticate & Obtain Tokens
-      const loginRes = await fetch(getApiUrl('/api/auth/login'), {
+      const loginRes = await fetch('http://localhost:8000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

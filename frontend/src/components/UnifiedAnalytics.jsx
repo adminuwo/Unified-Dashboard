@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../config/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,7 +100,7 @@ export const UnifiedAnalytics = () => {
   };
 
   const copySnippet = (appName, siteId) => {
-    const baseUrl = API_BASE_URL || (window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com');
+    const baseUrl = window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com';
     const code = `<script defer src="${baseUrl}/api/web-stats/tracker.js" data-site="${siteId}" data-endpoint="${baseUrl}/api/web-stats/collect"></script>`;
     navigator.clipboard.writeText(code);
     setCopiedApp(appName);
@@ -1004,7 +1003,7 @@ export const UnifiedAnalytics = () => {
                     </button>
                   </div>
                   <pre style={{ margin: 0, fontSize: '11px', color: '#94a3b8', overflowX: 'auto', background: 'transparent' }}>
-                    {`<script defer src="${API_BASE_URL || (window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com')}/api/web-stats/tracker.js" data-site="${item.site}" data-endpoint="${API_BASE_URL || (window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com')}/api/web-stats/collect"></script>`}
+                    {`<script defer src="${window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com'}/api/web-stats/tracker.js" data-site="${item.site}" data-endpoint="${window.location.hostname === 'localhost' ? window.location.origin : 'https://admin.uwo24.com'}/api/web-stats/collect"></script>`}
                   </pre>
                 </div>
               ))}

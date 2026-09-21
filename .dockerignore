@@ -3,8 +3,16 @@
 .gitignore
 .github
 
-# Python backend (migrated to Service 1 UWO-B)
-backend/
+# Python environment and caches
+backend/.venv
+backend/__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+backend/.pytest_cache
+backend/backups
 
 # Node / Frontend artifacts
 frontend/node_modules

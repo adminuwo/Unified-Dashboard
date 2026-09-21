@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { getApiUrl } from '../config/api';
 
 export const AuthTokenTester = () => {
   const [registerEmail, setRegisterEmail] = useState('');
@@ -28,7 +27,7 @@ export const AuthTokenTester = () => {
   const [loadingAction, setLoadingAction] = useState('');
 
 
-  const API_BASE = getApiUrl('/api');
+  const API_BASE = '/api';
 
   // Handle Registration
   const handleRegister = async (e) => {

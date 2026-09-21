@@ -34,12 +34,9 @@ ENV/
 .env.local
 .env.development.local
 .env.test.local
+.env.production.local
 *.env
 !.env.example
-!frontend/.env
-!frontend/.env.*
-!Unified-Dashboard/frontend/.env
-!Unified-Dashboard/frontend/.env.*
 
 # Logs
 /logs/

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
 
 const AuthContext = createContext(null);
 
@@ -13,7 +12,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(getApiUrl('/api/admin/login'), {
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -58,7 +57,7 @@ export const AuthProvider = ({ children }) => {
       'Authorization': `Bearer ${token}`,
     };
 
-    const res = await fetch(getApiUrl(url), { ...options, headers });
+    const res = await fetch(url, { ...options, headers });
     if (res.status === 401) {
       logout();
     }

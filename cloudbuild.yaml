@@ -32,7 +32,6 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=8080'
-      - '--set-env-vars=BACKEND_API_URL=${_BACKEND_API_URL}'
 
 images:
   - '${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}'
@@ -42,7 +41,6 @@ substitutions:
   _LOCATION: 'asia-south1'
   _REPOSITORY: 'unified-dashboard-repo'
   _SERVICE_NAME: 'unified-dashboard'
-  _BACKEND_API_URL: 'https://uwo24.com'
 
 options:
   logging: CLOUD_LOGGING_ONLY
