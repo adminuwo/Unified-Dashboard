@@ -1,8 +1,13 @@
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from pymongo.database import Database  # type: ignore
-
-from src.database.models import ChatTrackingEntry, AppDownloadEntry, ApplicationKey
-from src.telemetry.schemas import ChatTrackingCreateRequest, AppDownloadCreateRequest, TelemetryOverviewResponse
+from src.database.models import ChatTrackingEntry, AppDownloadEntry, ApplicationKey, utc_now, generate_uuid
+from src.telemetry.schemas import (
+    ChatTrackingCreateRequest,
+    AppDownloadCreateRequest,
+    FirebaseEventCreateRequest,
+    TelemetryOverviewResponse
+)
 
 
 def record_chat_tracking(
@@ -14,8 +19,8 @@ def record_chat_tracking(
     calc_tokens = data.total_tokens if data.total_tokens and data.total_tokens > 0 else (data.prompt_tokens + data.completion_tokens)
 
     entry_dict = ChatTrackingEntry.create_dict(
-        application_id=app.id,
-        app_code=app.app_code or "general",
+        application_id=app.id if app else "direct_telemetry",
+        app_code=(app.app_code if app else "general") or "general",
         session_id=data.session_id,
         model_name=data.model_name,
         prompt_tokens=data.prompt_tokens,
@@ -32,21 +37,99 @@ def record_chat_tracking(
 
 def record_app_download(
     db: Database,
-    app: ApplicationKey,
-    data: AppDownloadCreateRequest
+    app: Optional[ApplicationKey],
+    data: AppDownloadCreateRequest,
+    client_ip: Optional[str] = None
 ) -> AppDownloadEntry:
-    """Record an app download/install telemetry event."""
+    """Record an app download/install telemetry event (supports Firebase SDK & direct telemetry)."""
+    resolved_app_code = (data.app_code or (app.app_code if app else None) or "aisa").lower()
+    norm_platform = (data.platform or "android").lower()
+    if norm_platform in ["ios", "iphone", "ipad"]:
+        norm_platform = "ios"
+    elif norm_platform in ["android"]:
+        norm_platform = "android"
+    elif norm_platform in ["windows", "win"]:
+        norm_platform = "windows"
+    else:
+        norm_platform = "web_pwa"
+
     entry_dict = AppDownloadEntry.create_dict(
-        application_id=app.id,
-        app_code=app.app_code or "general",
-        platform=data.platform,
-        version=data.version,
+        application_id=app.id if app else "firebase_mobile_sdk",
+        app_code=resolved_app_code,
+        platform=norm_platform,
+        version=data.version or "1.0.0",
         ip_country=data.ip_country or "IN",
         user_id=data.user_id
     )
+    if data.device_id:
+        entry_dict["device_id"] = data.device_id
+    if data.fingerprint:
+        entry_dict["fingerprint"] = data.fingerprint
+    if client_ip:
+        entry_dict["ip"] = client_ip
+    entry_dict["attribution_method"] = data.attribution_method or "firebase_sdk"
 
     db["app_downloads"].insert_one(entry_dict)
     return AppDownloadEntry(entry_dict)
+
+
+def record_firebase_event(
+    db: Database,
+    data: FirebaseEventCreateRequest,
+    client_ip: Optional[str] = None
+) -> Dict[str, Any]:
+    """Record incoming event from Firebase Mobile SDK in client applications."""
+    event_name = (data.event_name or "first_open").lower().strip()
+    app_code = (data.app_code or "aisa").lower().strip()
+    platform = (data.platform or "android").lower().strip()
+    if platform in ["ios", "iphone", "ipad"]:
+        platform = "ios"
+    elif platform in ["android"]:
+        platform = "android"
+    elif platform in ["windows", "win"]:
+        platform = "windows"
+    else:
+        platform = "web_pwa"
+
+    now = utc_now()
+    is_install_event = event_name in ["first_open", "app_install", "install", "download", "first_time_open"]
+
+    # Check for deduplication by device_id if provided
+    is_new = True
+    if data.device_id:
+        existing = db["app_downloads"].find_one({
+            "device_id": data.device_id,
+            "app_code": app_code
+        })
+        if existing:
+            is_new = False
+
+    if is_install_event and is_new:
+        doc = {
+            "_id": generate_uuid(),
+            "application_id": "firebase_mobile_sdk",
+            "app_code": app_code,
+            "platform": platform,
+            "version": data.version or "1.0.0",
+            "ip_country": "IN",
+            "ip": client_ip,
+            "device_id": data.device_id,
+            "user_id": data.user_id,
+            "event_name": event_name,
+            "attribution_method": "firebase_sdk",
+            "metadata": data.metadata or {},
+            "created_at": now
+        }
+        db["app_downloads"].insert_one(doc)
+
+    return {
+        "success": True,
+        "event_name": event_name,
+        "app_code": app_code,
+        "platform": platform,
+        "is_new_install": is_install_event and is_new,
+        "recorded_at": now
+    }
 
 
 def classify_legal_chat(title: str, summary: str, key_issue: str, client_name: str) -> str:

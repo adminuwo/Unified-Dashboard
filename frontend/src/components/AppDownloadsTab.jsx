@@ -221,7 +221,7 @@ export const AppDownloadsTab = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', flexShrink: 0 }}></span>
-          <span style={{ fontSize: '12px', color: '#34d399', fontWeight: '600' }}>Live Data Feed Active</span>
+          <span style={{ fontSize: '12px', color: '#34d399', fontWeight: '600' }}>Firebase SDK + Store Telemetry Active</span>
           {lastSynced && (
             <span style={{ fontSize: '11px', color: '#64748b' }}>
               • Last synced: {lastSynced.toLocaleTimeString()}
@@ -335,20 +335,20 @@ export const AppDownloadsTab = () => {
 
         <div className="metric-card">
           <div className="metric-header">
-            <span>Android (Play Store)</span>
+            <span>Android (Play Store + Firebase SDK)</span>
             <div className="metric-icon">🤖</div>
           </div>
           <div className="metric-value">{androidInstalls.toLocaleString()}</div>
-          <div className="metric-sub">{combined.active_device_installs_latest || 0} active devices • from Play Console</div>
+          <div className="metric-sub">{combined.active_device_installs_latest || 0} active devices • {combined.firebase_android || 0} via Firebase SDK</div>
         </div>
 
         <div className="metric-card" style={{ borderColor: 'rgba(56, 189, 248, 0.4)', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(15, 23, 42, 0.6) 100%)' }}>
           <div className="metric-header">
-            <span>Apple App Store (iOS)</span>
+            <span>Apple App Store (iOS + Firebase SDK)</span>
             <div className="metric-icon">🍏</div>
           </div>
           <div className="metric-value" style={{ color: '#38bdf8' }}>{iosDownloads.toLocaleString()}</div>
-          <div className="metric-sub">{combined.ios_first_time_downloads || 0} 1st time • {combined.ios_redownloads || 0} redownloads • {combined.ios_page_views || 0} views</div>
+          <div className="metric-sub">{combined.ios_first_time_downloads || 0} 1st time • {combined.firebase_ios || 0} via Firebase SDK • {combined.ios_page_views || 0} views</div>
         </div>
       </div>
 
@@ -452,7 +452,7 @@ export const AppDownloadsTab = () => {
               <tr>
                 <td>
                   <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
-                    🤖 android (Google Play)
+                    🤖 Android (Google Play + Firebase SDK)
                   </span>
                 </td>
                 <td>{androidInstalls.toLocaleString()}</td>
@@ -475,7 +475,7 @@ export const AppDownloadsTab = () => {
               <tr>
                 <td>
                   <span style={{ fontWeight: '700', color: '#f8fafc', textTransform: 'uppercase' }}>
-                    🍏 iOS (App Store)
+                    🍏 iOS (App Store + Firebase SDK)
                   </span>
                 </td>
                 <td>{(combined.ios_total_downloads || 0).toLocaleString()}</td>

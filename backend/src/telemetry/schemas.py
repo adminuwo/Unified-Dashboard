@@ -33,6 +33,10 @@ class ChatTrackingResponse(BaseModel):
 class AppDownloadCreateRequest(BaseModel):
     platform: str = Field(..., description="OS/Platform: android, ios, windows, web_pwa")
     version: str = Field("1.0.0", description="Application release version")
+    app_code: Optional[str] = Field(None, description="App identifier: ailegal, aisa, uwo, etc.")
+    device_id: Optional[str] = Field(None, description="Unique device ID or advertising ID")
+    fingerprint: Optional[str] = Field(None, description="Device fingerprint")
+    attribution_method: Optional[str] = Field(None, description="Attribution origin, e.g. firebase_sdk, direct, organic")
     ip_country: Optional[str] = Field("IN", description="ISO country code")
     user_id: Optional[str] = Field(None, description="Associated user ID if authenticated")
 
@@ -48,6 +52,25 @@ class AppDownloadResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FirebaseEventCreateRequest(BaseModel):
+    event_name: str = Field("first_open", description="Firebase event name, e.g. first_open, app_install, app_open")
+    app_code: Optional[str] = Field("aisa", description="App code: ailegal, aisa, uwo, etc.")
+    platform: Optional[str] = Field("android", description="Platform: android, ios, web_pwa")
+    device_id: Optional[str] = Field(None, description="Unique client/Firebase device instance ID")
+    version: Optional[str] = Field("1.0.0", description="App release version")
+    user_id: Optional[str] = Field(None, description="Optional authenticated user ID")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Custom Firebase event parameters")
+
+
+class FirebaseEventResponse(BaseModel):
+    success: bool
+    event_name: str
+    app_code: str
+    platform: str
+    is_new_install: bool
+    recorded_at: datetime
 
 
 class TelemetryOverviewResponse(BaseModel):

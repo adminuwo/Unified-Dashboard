@@ -138,36 +138,79 @@ def get_unified_overview(
     web_stats = ga4_service.get_normalized_web_analytics(db, app_code=app_code, days=days)
     total_web_pageviews = web_stats.get("total_pageviews", 0)
 
-    # 4. Mobile Metrics (Google Play + App Store) using real play_install_metrics & app_store_metrics
+    # 4. Mobile Metrics (Google Play + App Store + Firebase SDK) using real play_install_metrics, app_store_metrics & app_downloads
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
     play_filter: Dict[str, Any] = {
         "dimension_type": "overview",
-        "metric_date": {"$gte": cutoff.strftime("%Y-%m-%d")}
+        "metric_date": {"$gte": cutoff_str}
     }
     ios_filter: Dict[str, Any] = {
-        "metric_date": {"$gte": cutoff.strftime("%Y-%m-%d")}
+        "metric_date": {"$gte": cutoff_str}
+    }
+    dl_filter: Dict[str, Any] = {
+        "created_at": {"$gte": cutoff}
+    }
+    mkt_filter: Dict[str, Any] = {
+        "$or": [{"timestamp": {"$gte": cutoff}}, {"created_at": {"$gte": cutoff}}]
     }
     
     if app_code and app_code.lower() != "all":
         play_filter["app_code"] = app_code.lower()
         ios_filter["app_code"] = app_code.lower()
+        dl_filter["app_code"] = app_code.lower()
+        mkt_filter = {
+            "$and": [
+                {"$or": [{"product_id": app_code.lower()}, {"app_code": app_code.lower()}]},
+                {"$or": [{"timestamp": {"$gte": cutoff}}, {"created_at": {"$gte": cutoff}}]}
+            ]
+        }
         
     play_records = list(db["play_install_metrics"].find(play_filter))
     ios_records = list(db["app_store_metrics"].find(ios_filter))
+    dl_records = list(db["app_downloads"].find(dl_filter))
+    mkt_records = list(db["marketing_installs"].find(mkt_filter))
     
-    android_installs = sum(int(r.get("daily_device_installs", 0)) for r in play_records)
-    ios_units = sum(int(r.get("total_downloads", 0)) for r in ios_records)
+    fb_android = sum(1 for r in dl_records if (r.get("platform") or "").lower() == "android") + sum(1 for m in mkt_records if (m.get("platform") or "").lower() == "android")
+    fb_ios = sum(1 for r in dl_records if (r.get("platform") or "").lower() in ["ios", "iphone", "ipad"]) + sum(1 for m in mkt_records if (m.get("platform") or "").lower() in ["ios", "iphone", "ipad"])
+
+    android_installs = sum(int(r.get("daily_device_installs", 0)) for r in play_records) + fb_android
+    ios_units = sum(int(r.get("total_downloads", 0)) for r in ios_records) + fb_ios
     total_mobile_installs = android_installs + ios_units
     
     # Maps for daily timeline builder
     play_daily_map: Dict[str, int] = {}
     for r in play_records:
         d = r.get("metric_date")
-        play_daily_map[d] = play_daily_map.get(d, 0) + int(r.get("daily_device_installs", 0))
+        if d:
+            play_daily_map[d] = play_daily_map.get(d, 0) + int(r.get("daily_device_installs", 0))
         
     appstore_daily_map: Dict[str, int] = {}
     for r in ios_records:
         d = r.get("metric_date")
-        appstore_daily_map[d] = appstore_daily_map.get(d, 0) + int(r.get("total_downloads", 0))
+        if d:
+            appstore_daily_map[d] = appstore_daily_map.get(d, 0) + int(r.get("total_downloads", 0))
+
+    for r in dl_records:
+        ca = r.get("created_at")
+        if not ca:
+            continue
+        d = ca.strftime("%Y-%m-%d") if isinstance(ca, datetime) else str(ca)[:10]
+        plat = (r.get("platform") or "").lower()
+        if plat == "android":
+            play_daily_map[d] = play_daily_map.get(d, 0) + 1
+        elif plat in ["ios", "iphone", "ipad"]:
+            appstore_daily_map[d] = appstore_daily_map.get(d, 0) + 1
+
+    for m in mkt_records:
+        ts = m.get("timestamp") or m.get("created_at")
+        if not ts:
+            continue
+        d = ts.strftime("%Y-%m-%d") if isinstance(ts, datetime) else str(ts)[:10]
+        plat = (m.get("platform") or "").lower()
+        if plat == "android":
+            play_daily_map[d] = play_daily_map.get(d, 0) + 1
+        elif plat in ["ios", "iphone", "ipad"]:
+            appstore_daily_map[d] = appstore_daily_map.get(d, 0) + 1
 
     # 5. GCP Backend Performance
     gcp_stats = gcp_monitoring_service.get_gcp_backend_monitoring(db, hours=24)

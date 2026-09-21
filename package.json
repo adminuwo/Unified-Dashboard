@@ -1,0 +1,16 @@
+{
+  "name": "unified-dashboard-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unified Dashboard & Shared Infrastructure Backend Service",
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "powershell -Command \"Set-Location backend; .\\.venv\\Scripts\\Activate.ps1; uvicorn src.main:app --reload --port 8000\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "test:backend": "powershell -Command \"Set-Location backend; .\\.venv\\Scripts\\Activate.ps1; python -m pytest tests/ -v\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
